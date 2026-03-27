@@ -1,4 +1,6 @@
 const API_BASE_URL = "https://appointment-confirmation-seven.vercel.app";
+const DEFAULT_LOCATION_NAME = "Bullard Buying Center";
+const DEFAULT_LOCATION_ADDRESS = "1147 E. I65 Service Rd., Mobile, AL 36606";
 
 const ids = [
   "name",
@@ -66,8 +68,8 @@ async function restoreSettings() {
   elements.advisor.value = storage.presetAdvisor || "Jude";
   elements.advisorPhone.value = storage.presetAdvisorPhone || "";
   elements.advisorPhotoUrl.value = storage.presetAdvisorPhotoUrl || "";
-  elements.locationName.value = storage.presetLocationName || "Bullard Buying Center";
-  elements.locationAddress.value = storage.presetLocationAddress || "";
+  elements.locationName.value = storage.presetLocationName || DEFAULT_LOCATION_NAME;
+  elements.locationAddress.value = storage.presetLocationAddress || DEFAULT_LOCATION_ADDRESS;
   elements.googleMapsUrl.value = storage.presetGoogleMapsUrl || "";
   elements.googleReviewsUrl.value = storage.presetGoogleReviewsUrl || "";
   elements.yelpReviewsUrl.value = storage.presetYelpReviewsUrl || "";
@@ -144,8 +146,8 @@ async function generateLink() {
     advisor_name: elements.advisor.value.trim() || "Jude",
     advisor_phone: elements.advisorPhone.value.trim(),
     advisor_photo_url: elements.advisorPhotoUrl.value.trim(),
-    location_name: elements.locationName.value.trim(),
-    location_address: elements.locationAddress.value.trim(),
+    location_name: elements.locationName.value.trim() || DEFAULT_LOCATION_NAME,
+    location_address: elements.locationAddress.value.trim() || DEFAULT_LOCATION_ADDRESS,
     google_maps_url: elements.googleMapsUrl.value.trim(),
     google_reviews_url: elements.googleReviewsUrl.value.trim(),
     yelp_reviews_url: elements.yelpReviewsUrl.value.trim(),

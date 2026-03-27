@@ -1,3 +1,5 @@
+import { DEFAULT_LOCATION_ADDRESS, DEFAULT_LOCATION_NAME } from "@/lib/constants";
+
 type CreateCalendarEventInput = {
   name: string;
   vehicle: string;
@@ -5,6 +7,8 @@ type CreateCalendarEventInput = {
   scheduledAt?: string | null;
   email?: string;
   pageUrl: string;
+  locationName?: string;
+  locationAddress?: string;
 };
 
 type GoogleEventResponse = {
@@ -42,6 +46,7 @@ async function getGoogleAccessToken() {
 export async function createGoogleCalendarEvent(input: CreateCalendarEventInput) {
   const accessToken = await getGoogleAccessToken();
   const calendarId = process.env.GOOGLE_CALENDAR_ID || "primary";
+  const notifyEmail = process.env.CALENDAR_NOTIFY_EMAIL;
 
   if (!accessToken || !input.scheduledAt) {
     return null;
@@ -49,17 +54,23 @@ export async function createGoogleCalendarEvent(input: CreateCalendarEventInput)
 
   const start = new Date(input.scheduledAt);
   const end = new Date(start);
-  end.setMinutes(end.getMinutes() + 45);
+  end.setHours(end.getHours() + 1);
+
+  const location = input.locationAddress || input.locationName || `${DEFAULT_LOCATION_NAME}, ${DEFAULT_LOCATION_ADDRESS}`;
 
   const description = [
     `Vehicle: ${input.vehicle}`,
     `Appointment time: ${input.timeLabel}`,
+    `Location: ${location}`,
     `Page: ${input.pageUrl}`
   ].join("\n");
+
+  const attendees = [input.email, notifyEmail].filter(Boolean).map((email) => ({ email: email as string }));
 
   const body = {
     summary: `Appraisal - ${input.name} (${input.vehicle})`,
     description,
+    location,
     start: {
       dateTime: start.toISOString(),
       timeZone: "America/Chicago"
@@ -68,11 +79,11 @@ export async function createGoogleCalendarEvent(input: CreateCalendarEventInput)
       dateTime: end.toISOString(),
       timeZone: "America/Chicago"
     },
-    attendees: input.email ? [{ email: input.email }] : undefined
+    attendees: attendees.length > 0 ? attendees : undefined
   };
 
   const response = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?sendUpdates=${input.email ? "all" : "none"}`,
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?sendUpdates=${attendees.length > 0 ? "all" : "none"}`,
     {
       method: "POST",
       headers: {

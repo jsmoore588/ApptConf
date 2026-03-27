@@ -4,6 +4,7 @@ import { createUuid } from "@/lib/uuid";
 import { Appointment, FeaturedReview } from "@/lib/types";
 import { parseAppointmentTime, formatAppointmentDate } from "@/lib/datetime";
 import { createGoogleCalendarEvent } from "@/lib/calendar";
+import { DEFAULT_LOCATION_ADDRESS, DEFAULT_LOCATION_NAME } from "@/lib/constants";
 
 type CreatePayload = {
   name?: string;
@@ -94,8 +95,8 @@ export async function POST(request: NextRequest) {
     confirmed: false,
     opened_count: 0,
     engagement_score: 0,
-    location_name: body.location_name?.trim(),
-    location_address: body.location_address?.trim(),
+    location_name: body.location_name?.trim() || DEFAULT_LOCATION_NAME,
+    location_address: body.location_address?.trim() || DEFAULT_LOCATION_ADDRESS,
     google_maps_url: body.google_maps_url?.trim(),
     entrance_photo_urls: cleanArray(body.entrance_photo_urls),
     google_reviews_url: body.google_reviews_url?.trim(),
@@ -125,7 +126,9 @@ export async function POST(request: NextRequest) {
       timeLabel: savedAppointment.time,
       scheduledAt: savedAppointment.appointment_at,
       email: savedAppointment.email,
-      pageUrl
+      pageUrl,
+      locationName: savedAppointment.location_name,
+      locationAddress: savedAppointment.location_address
     });
 
     calendarSyncStatus = calendarEventId ? "synced" : "pending";

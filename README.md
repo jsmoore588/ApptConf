@@ -39,6 +39,7 @@ GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 GOOGLE_REFRESH_TOKEN=
 GOOGLE_CALENDAR_ID=primary
+CALENDAR_NOTIFY_EMAIL=
 ```
 
 Google Calendar creation runs only when the Google values are present and the appointment time can be parsed into a real timestamp.
@@ -53,6 +54,7 @@ If you deploy the app publicly, set `PUBLIC_APP_URL` to your real domain so gene
 5. Add the same values to Vercel environment variables.
 
 The app uses the service role key only on the server side for appointment creation, tracking, and dashboard settings.
+Set `CALENDAR_NOTIFY_EMAIL` if you want Google Calendar event invites to also notify your internal email address.
 
 ## API
 

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Appointment } from "@/lib/types";
 import { formatAppointmentDate } from "@/lib/datetime";
+import { DEFAULT_LOCATION_ADDRESS, DEFAULT_LOCATION_NAME } from "@/lib/constants";
 
 type Props = {
   appointment: Appointment;
@@ -28,7 +29,7 @@ function createGoogleCalendarLink(appointment: Appointment, startLabel: string) 
 
   const start = new Date(appointment.appointment_at);
   const end = new Date(start);
-  end.setMinutes(end.getMinutes() + 45);
+  end.setHours(end.getHours() + 1);
 
   const dateText = `${toGoogleDate(start)}/${toGoogleDate(end)}`;
   const text = encodeURIComponent(`Appointment - ${appointment.name}`);
@@ -36,7 +37,7 @@ function createGoogleCalendarLink(appointment: Appointment, startLabel: string) 
     `Vehicle: ${appointment.vehicle}\nTime: ${startLabel}\nAdvisor: ${appointment.advisor_name || appointment.advisor}`
   );
   const location = encodeURIComponent(
-    appointment.location_address || appointment.location_name || "Bullard Buying Center"
+    appointment.location_address || appointment.location_name || `${DEFAULT_LOCATION_NAME}, ${DEFAULT_LOCATION_ADDRESS}`
   );
 
   return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${dateText}&details=${details}&location=${location}`;
