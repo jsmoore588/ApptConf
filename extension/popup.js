@@ -3,21 +3,19 @@ const vehicleInput = document.getElementById("vehicle");
 const timeInput = document.getElementById("time");
 const emailInput = document.getElementById("email");
 const advisorInput = document.getElementById("advisor");
-const apiBaseUrlInput = document.getElementById("apiBaseUrl");
 const openTabInput = document.getElementById("openTab");
 const statusNode = document.getElementById("status");
 const generateButton = document.getElementById("generate");
+const API_BASE_URL = "https://appointment-confirmation-seven.vercel.app";
 
 async function restoreSettings() {
   const storage = await chrome.storage.local.get([
-    "apiBaseUrl",
     "advisor",
     "openTab",
     "draftName",
     "draftVehicle"
   ]);
 
-  apiBaseUrlInput.value = storage.apiBaseUrl || "http://localhost:6767";
   advisorInput.value = storage.advisor || "Jude";
   openTabInput.checked = storage.openTab !== false;
 
@@ -71,8 +69,7 @@ async function generateLink() {
     return;
   }
 
-  const apiBaseUrl = apiBaseUrlInput.value.trim().replace(/\/$/, "");
-  const endpoint = `${apiBaseUrl}/api/create-appointment`;
+  const endpoint = `${API_BASE_URL}/api/create-appointment`;
 
   generateButton.disabled = true;
   setStatus("Generating link...");
@@ -91,7 +88,6 @@ async function generateLink() {
     const data = await response.json();
     await navigator.clipboard.writeText(data.url);
     await chrome.storage.local.set({
-      apiBaseUrl,
       advisor: payload.advisor,
       openTab: openTabInput.checked,
       draftName: payload.name,
@@ -107,7 +103,7 @@ async function generateLink() {
     setStatus("Link copied — ready to send", "success");
   } catch (error) {
     console.error(error);
-    setStatus("Unable to create link. Check the API base URL.", "error");
+    setStatus("Unable to create link. Check the live deployment.", "error");
   } finally {
     generateButton.disabled = false;
   }

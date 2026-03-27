@@ -1,7 +1,5 @@
 import Link from "next/link";
 
-const sampleId = "sample-appointment";
-
 export default function HomePage() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-10 px-6 py-10 md:px-10">
@@ -21,14 +19,8 @@ export default function HomePage() {
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link
-              href={`/appt/${sampleId}`}
-              className="rounded-full bg-ink px-6 py-3 text-sm font-medium text-white transition hover:bg-black"
-            >
-              View sample page
-            </Link>
-            <Link
               href="/dashboard"
-              className="rounded-full border border-black/10 px-6 py-3 text-sm font-medium text-ink transition hover:border-black/20 hover:bg-black/5"
+              className="rounded-full bg-ink px-6 py-3 text-sm font-medium text-white transition hover:bg-black"
             >
               View dashboard
             </Link>
@@ -72,10 +64,10 @@ export default function HomePage() {
           </ol>
         </div>
         <div className="rounded-[1.5rem] bg-ink p-6 text-sm text-white/80">
-          <p className="font-medium text-white">Default sample appointment</p>
+          <p className="font-medium text-white">Live appointment pages</p>
           <p className="mt-3 leading-7">
-            A seeded appointment is included so the interface is immediately visible
-            after first run, even before generating new links.
+            Create links from the extension or API and each appointment page will be
+            generated from Supabase-backed data.
           </p>
         </div>
       </section>

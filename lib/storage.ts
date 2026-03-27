@@ -1,93 +1,9 @@
-import { promises as fs } from "fs";
-import path from "path";
-import { Appointment, AppointmentEvent, AppointmentEventType } from "@/lib/types";
 import { formatAppointmentDate, hoursUntil, isToday, isTomorrow } from "@/lib/datetime";
-
-type DatabaseShape = {
-  appointments: Appointment[];
-  events: AppointmentEvent[];
-};
+import { getSupabaseServerClient } from "@/lib/supabase";
+import { Appointment, AppointmentEvent, AppointmentEventType } from "@/lib/types";
 
 export type AppointmentStatus = "confirmed" | "viewed" | "not_opened";
 export type AppointmentPriority = "high" | "normal" | "low";
-
-const dataDirectory = path.join(process.cwd(), "data");
-const databasePath = path.join(dataDirectory, "appointments.json");
-
-function createSeedAppointment() {
-  const now = new Date();
-  const today = new Date(now);
-  today.setHours(15, 30, 0, 0);
-
-  const tomorrow = new Date(now);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(11, 0, 0, 0);
-
-  return {
-    appointments: [
-      {
-        id: "sample-appointment",
-        name: "Mia",
-        vehicle: "2021 Toyota Highlander XLE",
-        time: formatAppointmentDate(today.toISOString()),
-        scheduled_at: today.toISOString(),
-        advisor: "Jude",
-        mileage: "42,180 miles",
-        phone: "(555) 270-4482",
-        email: "mia@example.com",
-        notes: "Clean title, one key, excellent condition.",
-        confirmed: false,
-        opened_count: 0,
-        engagement_score: 0,
-        created_at: now.toISOString()
-      },
-      {
-        id: "sample-tomorrow",
-        name: "Chris",
-        vehicle: "2020 Ford F-150 Lariat",
-        time: formatAppointmentDate(tomorrow.toISOString()),
-        scheduled_at: tomorrow.toISOString(),
-        advisor: "Jude",
-        phone: "(555) 808-1299",
-        confirmed: false,
-        opened_count: 0,
-        engagement_score: 0,
-        created_at: now.toISOString()
-      }
-    ],
-    events: []
-  } satisfies DatabaseShape;
-}
-
-async function ensureDatabase() {
-  await fs.mkdir(dataDirectory, { recursive: true });
-
-  try {
-    await fs.access(databasePath);
-  } catch {
-    await fs.writeFile(databasePath, JSON.stringify(createSeedAppointment(), null, 2), "utf8");
-  }
-}
-
-async function readDatabase() {
-  await ensureDatabase();
-  const raw = await fs.readFile(databasePath, "utf8");
-  const db = JSON.parse(raw) as DatabaseShape;
-
-  if (!Array.isArray(db.appointments)) {
-    db.appointments = [];
-  }
-
-  if (!Array.isArray(db.events)) {
-    db.events = [];
-  }
-
-  return db;
-}
-
-async function writeDatabase(data: DatabaseShape) {
-  await fs.writeFile(databasePath, JSON.stringify(data, null, 2), "utf8");
-}
 
 function getStatus(appointment: Appointment): AppointmentStatus {
   if (appointment.confirmed) {
@@ -130,25 +46,60 @@ function toDashboardAppointment(appointment: Appointment) {
   };
 }
 
+function mapAppointment(row: Record<string, unknown>) {
+  return row as unknown as Appointment;
+}
+
+function mapEvent(row: Record<string, unknown>) {
+  const metadata = row.metadata as Record<string, string | number | boolean> | null;
+
+  return {
+    id: String(row.id),
+    appointmentId: String(row.appointment_id),
+    type: row.type as AppointmentEventType,
+    created_at: String(row.created_at),
+    metadata: metadata ?? undefined
+  } satisfies AppointmentEvent;
+}
+
 export async function listAppointments() {
-  const db = await readDatabase();
-  return db.appointments;
+  const supabase = getSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("appointments")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).map(mapAppointment);
 }
 
 export async function getDashboardMetrics() {
-  const db = await readDatabase();
-  const appointments = db.appointments.map(toDashboardAppointment);
+  const supabase = getSupabaseServerClient();
+  const [appointmentsResult, eventsResult] = await Promise.all([
+    supabase.from("appointments").select("*").order("scheduled_at", { ascending: true }),
+    supabase.from("appointment_events").select("*").order("created_at", { ascending: false })
+  ]);
+
+  if (appointmentsResult.error) {
+    throw appointmentsResult.error;
+  }
+
+  if (eventsResult.error) {
+    throw eventsResult.error;
+  }
+
+  const appointments = (appointmentsResult.data ?? []).map(mapAppointment).map(toDashboardAppointment);
+  const events = (eventsResult.data ?? []).map(mapEvent);
   const totalAppointments = appointments.length;
-  const totalOpens = db.events.filter((event) => event.type === "page_opened").length;
-  const totalConfirmations = db.events.filter((event) => event.type === "confirm_clicked").length;
+  const totalOpens = events.filter((event) => event.type === "page_opened").length;
+  const totalConfirmations = events.filter((event) => event.type === "confirm_clicked").length;
   const highIntent = appointments.filter((appointment) => (appointment.opened_count ?? 0) > 2).length;
   const viewedAppointments = appointments.filter((appointment) => (appointment.opened_count ?? 0) > 0).length;
-  const todayAppointments = appointments
-    .filter((appointment) => isToday(appointment.scheduled_at))
-    .sort((a, b) => (a.scheduled_at || "").localeCompare(b.scheduled_at || ""));
-  const tomorrowAppointments = appointments
-    .filter((appointment) => isTomorrow(appointment.scheduled_at))
-    .sort((a, b) => (a.scheduled_at || "").localeCompare(b.scheduled_at || ""));
+  const todayAppointments = appointments.filter((appointment) => isToday(appointment.scheduled_at));
+  const tomorrowAppointments = appointments.filter((appointment) => isTomorrow(appointment.scheduled_at));
 
   const suggestions = [
     appointments.some(
@@ -177,28 +128,41 @@ export async function getDashboardMetrics() {
 }
 
 export async function getAppointmentById(id: string) {
-  const db = await readDatabase();
-  return db.appointments.find((appointment) => appointment.id === id) ?? null;
+  const supabase = getSupabaseServerClient();
+  const { data, error } = await supabase.from("appointments").select("*").eq("id", id).maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data ? mapAppointment(data) : null;
 }
 
 export async function createAppointment(appointment: Appointment) {
-  const db = await readDatabase();
-  db.appointments.unshift(appointment);
-  await writeDatabase(db);
+  const supabase = getSupabaseServerClient();
+  const { error } = await supabase.from("appointments").insert(appointment);
+
+  if (error) {
+    throw error;
+  }
+
   return appointment;
 }
 
 export async function updateAppointment(id: string, partial: Partial<Appointment>) {
-  const db = await readDatabase();
-  const appointment = db.appointments.find((item) => item.id === id);
+  const supabase = getSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("appointments")
+    .update(partial)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
 
-  if (!appointment) {
-    return null;
+  if (error) {
+    throw error;
   }
 
-  Object.assign(appointment, partial);
-  await writeDatabase(db);
-  return appointment;
+  return data ? mapAppointment(data) : null;
 }
 
 export async function registerEvent(
@@ -206,8 +170,7 @@ export async function registerEvent(
   type: AppointmentEventType,
   metadata?: Record<string, string | number | boolean>
 ) {
-  const db = await readDatabase();
-  const appointment = db.appointments.find((item) => item.id === appointmentId);
+  const appointment = await getAppointmentById(appointmentId);
 
   if (!appointment) {
     return null;
@@ -222,37 +185,61 @@ export async function registerEvent(
     metadata
   };
 
-  db.events.unshift(event);
+  const supabase = getSupabaseServerClient();
+  const { error: eventError } = await supabase.from("appointment_events").insert({
+    id: event.id,
+    appointment_id: event.appointmentId,
+    type: event.type,
+    created_at: event.created_at,
+    metadata: event.metadata ?? {}
+  });
+
+  if (eventError) {
+    throw eventError;
+  }
+
+  const nextPatch: Partial<Appointment> = {};
 
   if (type === "page_opened") {
-    appointment.opened_count = (appointment.opened_count ?? 0) + 1;
-    appointment.last_opened_at = timestamp;
-    appointment.first_opened_at = appointment.first_opened_at ?? timestamp;
-    appointment.engagement_score = Math.min((appointment.engagement_score ?? 0) + 20, 100);
+    nextPatch.opened_count = (appointment.opened_count ?? 0) + 1;
+    nextPatch.last_opened_at = timestamp;
+    nextPatch.first_opened_at = appointment.first_opened_at ?? timestamp;
+    nextPatch.engagement_score = Math.min((appointment.engagement_score ?? 0) + 20, 100);
   }
 
   if (type === "confirm_clicked") {
-    appointment.confirmed = true;
-    appointment.confirmed_at = timestamp;
-    appointment.engagement_score = Math.min((appointment.engagement_score ?? 0) + 35, 100);
+    nextPatch.confirmed = true;
+    nextPatch.confirmed_at = timestamp;
+    nextPatch.engagement_score = Math.min((appointment.engagement_score ?? 0) + 35, 100);
   }
 
-  await writeDatabase(db);
+  const updatedAppointment =
+    Object.keys(nextPatch).length > 0 ? await updateAppointment(appointmentId, nextPatch) : appointment;
+
   return {
-    appointment,
+    appointment: updatedAppointment ?? appointment,
     event
   };
 }
 
 export async function getAppointmentAnalytics(appointmentId: string) {
-  const db = await readDatabase();
-  const appointment = db.appointments.find((item) => item.id === appointmentId) ?? null;
+  const supabase = getSupabaseServerClient();
+  const appointment = await getAppointmentById(appointmentId);
 
   if (!appointment) {
     return null;
   }
 
-  const events = db.events.filter((event) => event.appointmentId === appointmentId);
+  const { data, error } = await supabase
+    .from("appointment_events")
+    .select("*")
+    .eq("appointment_id", appointmentId);
+
+  if (error) {
+    throw error;
+  }
+
+  const events = (data ?? []).map(mapEvent);
   const opens = events.filter((event) => event.type === "page_opened").length;
   const confirmations = events.filter((event) => event.type === "confirm_clicked").length;
   const status = getStatus(appointment);
