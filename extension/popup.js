@@ -1,30 +1,91 @@
-const nameInput = document.getElementById("name");
-const vehicleInput = document.getElementById("vehicle");
-const timeInput = document.getElementById("time");
-const emailInput = document.getElementById("email");
-const advisorInput = document.getElementById("advisor");
-const openTabInput = document.getElementById("openTab");
+const API_BASE_URL = "https://appointment-confirmation-seven.vercel.app";
+
+const ids = [
+  "name",
+  "vehicle",
+  "time",
+  "email",
+  "advisor",
+  "advisorPhone",
+  "advisorPhotoUrl",
+  "locationName",
+  "locationAddress",
+  "googleMapsUrl",
+  "googleReviewsUrl",
+  "yelpReviewsUrl",
+  "entrancePhotoUrl",
+  "review1",
+  "reviewer1",
+  "review2",
+  "reviewer2",
+  "review3",
+  "reviewer3",
+  "openTab"
+];
+
+const elements = Object.fromEntries(ids.map((id) => [id, document.getElementById(id)]));
 const statusNode = document.getElementById("status");
 const generateButton = document.getElementById("generate");
-const API_BASE_URL = "https://appointment-confirmation-seven.vercel.app";
+const savePresetsButton = document.getElementById("savePresets");
+
+function setStatus(message, tone = "") {
+  statusNode.textContent = message;
+  statusNode.dataset.tone = tone;
+}
+
+function collectFeaturedReviews() {
+  return [
+    { review_text: elements.review1.value.trim(), reviewer_name: elements.reviewer1.value.trim() },
+    { review_text: elements.review2.value.trim(), reviewer_name: elements.reviewer2.value.trim() },
+    { review_text: elements.review3.value.trim(), reviewer_name: elements.reviewer3.value.trim() }
+  ].filter((item) => item.review_text && item.reviewer_name);
+}
 
 async function restoreSettings() {
   const storage = await chrome.storage.local.get([
-    "advisor",
     "openTab",
     "draftName",
-    "draftVehicle"
+    "draftVehicle",
+    "presetAdvisor",
+    "presetAdvisorPhone",
+    "presetAdvisorPhotoUrl",
+    "presetLocationName",
+    "presetLocationAddress",
+    "presetGoogleMapsUrl",
+    "presetGoogleReviewsUrl",
+    "presetYelpReviewsUrl",
+    "presetEntrancePhotoUrl",
+    "presetReview1",
+    "presetReviewer1",
+    "presetReview2",
+    "presetReviewer2",
+    "presetReview3",
+    "presetReviewer3"
   ]);
 
-  advisorInput.value = storage.advisor || "Jude";
-  openTabInput.checked = storage.openTab !== false;
+  elements.advisor.value = storage.presetAdvisor || "Jude";
+  elements.advisorPhone.value = storage.presetAdvisorPhone || "";
+  elements.advisorPhotoUrl.value = storage.presetAdvisorPhotoUrl || "";
+  elements.locationName.value = storage.presetLocationName || "Bullard Buying Center";
+  elements.locationAddress.value = storage.presetLocationAddress || "";
+  elements.googleMapsUrl.value = storage.presetGoogleMapsUrl || "";
+  elements.googleReviewsUrl.value = storage.presetGoogleReviewsUrl || "";
+  elements.yelpReviewsUrl.value = storage.presetYelpReviewsUrl || "";
+  elements.entrancePhotoUrl.value = storage.presetEntrancePhotoUrl || "";
+  elements.review1.value = storage.presetReview1 || "";
+  elements.reviewer1.value = storage.presetReviewer1 || "";
+  elements.review2.value = storage.presetReview2 || "";
+  elements.reviewer2.value = storage.presetReviewer2 || "";
+  elements.review3.value = storage.presetReview3 || "";
+  elements.reviewer3.value = storage.presetReviewer3 || "";
+  elements.openTab.checked = storage.openTab !== false;
 
   if (storage.draftName) {
-    nameInput.value = storage.draftName;
+    elements.name.value = storage.draftName;
   }
 
   if (storage.draftVehicle) {
-    vehicleInput.value = storage.draftVehicle;
+    elements.vehicle.value = storage.draftVehicle;
   }
 
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -38,30 +99,60 @@ async function restoreSettings() {
       type: "APPOINTMENT_ENGINE_EXTRACT"
     });
 
-    if (response?.name && !nameInput.value) {
-      nameInput.value = response.name;
+    if (response?.name && !elements.name.value) {
+      elements.name.value = response.name;
     }
 
-    if (response?.vehicle && !vehicleInput.value) {
-      vehicleInput.value = response.vehicle;
+    if (response?.vehicle && !elements.vehicle.value) {
+      elements.vehicle.value = response.vehicle;
     }
   } catch (_error) {
     // Ignore pages where the content script is unavailable.
   }
 }
 
-function setStatus(message, tone = "") {
-  statusNode.textContent = message;
-  statusNode.dataset.tone = tone;
+async function savePresets() {
+  await chrome.storage.local.set({
+    presetAdvisor: elements.advisor.value.trim(),
+    presetAdvisorPhone: elements.advisorPhone.value.trim(),
+    presetAdvisorPhotoUrl: elements.advisorPhotoUrl.value.trim(),
+    presetLocationName: elements.locationName.value.trim(),
+    presetLocationAddress: elements.locationAddress.value.trim(),
+    presetGoogleMapsUrl: elements.googleMapsUrl.value.trim(),
+    presetGoogleReviewsUrl: elements.googleReviewsUrl.value.trim(),
+    presetYelpReviewsUrl: elements.yelpReviewsUrl.value.trim(),
+    presetEntrancePhotoUrl: elements.entrancePhotoUrl.value.trim(),
+    presetReview1: elements.review1.value.trim(),
+    presetReviewer1: elements.reviewer1.value.trim(),
+    presetReview2: elements.review2.value.trim(),
+    presetReviewer2: elements.reviewer2.value.trim(),
+    presetReview3: elements.review3.value.trim(),
+    presetReviewer3: elements.reviewer3.value.trim(),
+    openTab: elements.openTab.checked
+  });
+
+  setStatus("Presets saved.", "success");
 }
 
 async function generateLink() {
   const payload = {
-    name: nameInput.value.trim(),
-    vehicle: vehicleInput.value.trim(),
-    time: timeInput.value.trim(),
-    email: emailInput.value.trim(),
-    advisor: advisorInput.value.trim() || "Jude"
+    name: elements.name.value.trim(),
+    vehicle: elements.vehicle.value.trim(),
+    time: elements.time.value.trim(),
+    email: elements.email.value.trim(),
+    advisor: elements.advisor.value.trim() || "Jude",
+    advisor_name: elements.advisor.value.trim() || "Jude",
+    advisor_phone: elements.advisorPhone.value.trim(),
+    advisor_photo_url: elements.advisorPhotoUrl.value.trim(),
+    location_name: elements.locationName.value.trim(),
+    location_address: elements.locationAddress.value.trim(),
+    google_maps_url: elements.googleMapsUrl.value.trim(),
+    google_reviews_url: elements.googleReviewsUrl.value.trim(),
+    yelp_reviews_url: elements.yelpReviewsUrl.value.trim(),
+    entrance_photo_urls: elements.entrancePhotoUrl.value.trim()
+      ? [elements.entrancePhotoUrl.value.trim()]
+      : [],
+    featured_reviews: collectFeaturedReviews()
   };
 
   if (!payload.name || !payload.vehicle || !payload.time) {
@@ -69,13 +160,11 @@ async function generateLink() {
     return;
   }
 
-  const endpoint = `${API_BASE_URL}/api/create-appointment`;
-
   generateButton.disabled = true;
   setStatus("Generating link...");
 
   try {
-    const response = await fetch(endpoint, {
+    const response = await fetch(`${API_BASE_URL}/api/create-appointment`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -88,19 +177,18 @@ async function generateLink() {
     const data = await response.json();
     await navigator.clipboard.writeText(data.url);
     await chrome.storage.local.set({
-      advisor: payload.advisor,
-      openTab: openTabInput.checked,
       draftName: payload.name,
-      draftVehicle: payload.vehicle
+      draftVehicle: payload.vehicle,
+      openTab: elements.openTab.checked
     });
 
     chrome.runtime.sendMessage({
       type: "APPOINTMENT_ENGINE_CREATED",
       url: data.url,
-      open: openTabInput.checked
+      open: elements.openTab.checked
     });
 
-    setStatus("Link copied — ready to send", "success");
+    setStatus("Link copied - ready to send", "success");
   } catch (error) {
     console.error(error);
     setStatus("Unable to create link. Check the live deployment.", "error");
@@ -110,4 +198,5 @@ async function generateLink() {
 }
 
 generateButton.addEventListener("click", generateLink);
+savePresetsButton.addEventListener("click", savePresets);
 restoreSettings();

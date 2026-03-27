@@ -11,7 +11,7 @@
       <section class="card">
         <div class="eyebrow">Appointment Engine</div>
         <h1>Generate appointment link</h1>
-        <p class="subtle">Fast, personal, and ready to send.</p>
+        <p class="subtle">Quick customer details up top. Presets and trust content tucked underneath.</p>
 
         <label>
           <span>Name</span>
@@ -37,6 +37,88 @@
           <span>Advisor</span>
           <input id="advisor" type="text" value="Jude" />
         </label>
+
+        <details class="details">
+          <summary>More Options</summary>
+
+          <div class="details-body">
+            <p class="section-label">Saved Presets</p>
+
+            <label>
+              <span>Advisor phone</span>
+              <input id="advisorPhone" type="text" placeholder="555-555-5555" />
+            </label>
+
+            <label>
+              <span>Advisor photo URL</span>
+              <input id="advisorPhotoUrl" type="url" placeholder="https://..." />
+            </label>
+
+            <label>
+              <span>Location name</span>
+              <input id="locationName" type="text" placeholder="Bullard Buying Center" />
+            </label>
+
+            <label>
+              <span>Location address</span>
+              <input id="locationAddress" type="text" placeholder="Street, City, State" />
+            </label>
+
+            <label>
+              <span>Google Maps URL</span>
+              <input id="googleMapsUrl" type="url" placeholder="https://maps.google.com/..." />
+            </label>
+
+            <label>
+              <span>Google reviews URL</span>
+              <input id="googleReviewsUrl" type="url" placeholder="https://..." />
+            </label>
+
+            <label>
+              <span>Yelp reviews URL</span>
+              <input id="yelpReviewsUrl" type="url" placeholder="https://..." />
+            </label>
+
+            <label>
+              <span>Entrance photo URL</span>
+              <input id="entrancePhotoUrl" type="url" placeholder="https://..." />
+            </label>
+
+            <p class="section-label">Featured Reviews</p>
+
+            <label>
+              <span>Review 1</span>
+              <input id="review1" type="text" placeholder="Way easier than dealing with people online." />
+            </label>
+
+            <label>
+              <span>Reviewer 1</span>
+              <input id="reviewer1" type="text" placeholder="Mark" />
+            </label>
+
+            <label>
+              <span>Review 2</span>
+              <input id="review2" type="text" placeholder="They showed me real numbers." />
+            </label>
+
+            <label>
+              <span>Reviewer 2</span>
+              <input id="reviewer2" type="text" placeholder="Ashley" />
+            </label>
+
+            <label>
+              <span>Review 3</span>
+              <input id="review3" type="text" placeholder="In and out. Super simple." />
+            </label>
+
+            <label>
+              <span>Reviewer 3</span>
+              <input id="reviewer3" type="text" placeholder="Daniel" />
+            </label>
+
+            <button id="savePresets" type="button" class="secondary">Save Presets</button>
+          </div>
+        </details>
 
         <label class="toggle">
           <input id="openTab" type="checkbox" checked />
