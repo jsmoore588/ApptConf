@@ -9,16 +9,9 @@ type Props = {
   appointment: Appointment;
 };
 
-const progressSteps = [
-  { label: "Vehicle Submitted", complete: true },
-  { label: "Market Data Pulled", complete: true },
-  { label: "Final Walkthrough", complete: false }
-];
-
 const arrivalSteps = [
   "Pull into the front lot",
-  "Park near the buying center entrance",
-  "Ask for your advisor inside"
+  "Park near the buying center entrance"
 ];
 
 const expectationSteps = [
@@ -27,16 +20,19 @@ const expectationSteps = [
   { label: "Offer", time: "~10-15 min" }
 ];
 
-const sellerQuotes = [
-  { quote: "Everything was straightforward and they were ready for me when I got there.", name: "Amanda R." },
-  { quote: "I liked knowing what to bring ahead of time. It made the visit easy.", name: "Derrick L." },
-  { quote: "It felt organized, calm, and not pushy at all.", name: "Maria T." }
+const testimonials = [
+  { quote: "Way easier than dealing with people online.", name: "Mark" },
+  { quote: "They showed me real numbers.", name: "Ashley" },
+  { quote: "In and out. Super simple.", name: "Daniel" }
 ];
 
 export function AppointmentPage({ appointment }: Props) {
   const [confirmed, setConfirmed] = useState(Boolean(appointment.confirmed));
   const [toast, setToast] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const advisorName = appointment.advisor || "Jude";
+  const timeLabel = appointment.scheduled_at ? formatAppointmentDate(appointment.scheduled_at) : appointment.time;
+  const shortTime = appointment.time || timeLabel;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -50,8 +46,6 @@ export function AppointmentPage({ appointment }: Props) {
 
     return () => controller.abort();
   }, [appointment.id]);
-
-  const timeLabel = appointment.scheduled_at ? formatAppointmentDate(appointment.scheduled_at) : appointment.time;
 
   async function handleConfirm() {
     setIsSubmitting(true);
@@ -68,197 +62,138 @@ export function AppointmentPage({ appointment }: Props) {
       }
 
       setConfirmed(true);
-      setToast("Thanks. We will be ready for you when you arrive.");
+      setToast(`Perfect - I'll be ready for you at ${shortTime}.`);
     } catch {
-      setToast("We could not save that right now, but your time is still reserved.");
+      setToast("Your time is still set aside. If needed, just reply back and we will take care of it.");
     } finally {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
-      <section className="overflow-hidden rounded-[2rem] border border-black/5 bg-white/80 p-6 shadow-card backdrop-blur md:p-8">
-        <div className="grid gap-6 md:grid-cols-[1.2fr_0.8fr]">
-          <div className="space-y-5">
-            <p className="inline-flex rounded-full bg-accent-soft px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-forest">
-              Appointment reserved
+    <main className="min-h-screen bg-[#f3ecdf] px-5 py-8 text-[#171512]">
+      <div className="mx-auto flex w-full max-w-[640px] flex-col gap-8">
+        <section className="space-y-4 pt-2">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#8b7f70]">
+            Appointment Set
+          </p>
+          <div className="space-y-3">
+            <h1 className="text-4xl font-semibold leading-[1.02] tracking-[-0.03em] text-[#171512] md:text-5xl">
+              {advisorName} - you&apos;re all set for {shortTime}
+            </h1>
+            <p className="max-w-[34rem] text-[17px] leading-8 text-[#4d463f]">
+              I&apos;ve got everything ready for your {appointment.vehicle} so this is quick when you get here.
             </p>
-            <div className="space-y-3">
-              <h1 className="max-w-2xl text-3xl font-semibold leading-tight text-ink md:text-6xl">
-                {appointment.name} - your appraisal is already in progress
-              </h1>
-              <p className="max-w-xl text-base leading-7 text-black/65 md:text-lg">
-                We are preparing your {appointment.vehicle} at Bullard Buying Center for {timeLabel}.
-              </p>
+          </div>
+        </section>
+
+        <section className="space-y-5">
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#ddd0bf] text-lg font-semibold text-[#171512]">
+              {advisorName.slice(0, 1)}
             </div>
-            <div className="rounded-[1.5rem] border border-black/5 bg-[#faf7f0] p-4">
-              <p className="text-sm font-medium text-ink">We have your time set aside.</p>
-              <p className="mt-2 text-sm leading-6 text-black/60">
-                This page has everything you need so the visit feels simple and clear before you arrive.
-              </p>
+            <div>
+              <p className="text-lg font-semibold text-[#171512]">{advisorName}</p>
+              <p className="text-sm leading-7 text-[#5b534a]">I&apos;ll be ready for you when you get here.</p>
             </div>
           </div>
 
-          <div className="rounded-[1.75rem] bg-ink p-5 text-white">
-            <p className="text-xs font-medium uppercase tracking-[0.2em] text-white/60">Progress</p>
-            <div className="mt-5 h-3 rounded-full bg-white/10">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: "72%" }}
-                transition={{ duration: 1.2, ease: "easeOut" }}
-                className="h-3 rounded-full bg-[#c9a06f]"
-              />
-            </div>
-            <div className="mt-5 space-y-3">
-              {progressSteps.map((step, index) => (
-                <motion.div
-                  key={step.label}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.12 }}
-                  className="flex items-center justify-between rounded-2xl border border-white/10 px-4 py-3"
-                >
-                  <span className="text-sm">{step.label}</span>
-                  <span
-                    className={`rounded-full px-2 py-1 text-xs ${
-                      step.complete ? "bg-white/15 text-white" : "bg-[#c9a06f] text-ink"
-                    }`}
-                  >
-                    {step.complete ? "Complete" : "Pending"}
-                  </span>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={confirmed || isSubmitting}
+            className="w-full rounded-[18px] bg-[#234638] px-5 py-4 text-base font-semibold text-white transition hover:bg-[#1d3b2f] disabled:cursor-not-allowed disabled:bg-[#71887d]"
+          >
+            {confirmed ? `I'll be there at ${shortTime}` : `I'll be there at ${shortTime}`}
+          </button>
 
-      <section className="grid gap-6 md:grid-cols-[0.92fr_1.08fr]">
-        <div className="space-y-6">
-          <section className="rounded-[2rem] border border-black/5 bg-white/80 p-6 shadow-card backdrop-blur">
-            <div className="flex items-center gap-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#e4ddd0] text-lg font-semibold text-ink">
-                {appointment.advisor.slice(0, 1)}
-              </div>
-              <div>
-                <p className="text-sm uppercase tracking-[0.2em] text-black/45">Your Appraisal Advisor</p>
-                <p className="mt-1 text-2xl font-semibold text-ink">{appointment.advisor}</p>
-              </div>
-            </div>
-            <p className="mt-4 text-sm leading-7 text-black/65">I&apos;ll be ready for you when you get here.</p>
-          </section>
-
-          <section className="rounded-[2rem] border border-black/5 bg-white/80 p-6 shadow-card backdrop-blur">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-black/40">When You Arrive</p>
-            <div className="mt-4 grid gap-3">
-              {arrivalSteps.map((step, index) => (
-                <div key={step} className="rounded-[1.4rem] border border-black/5 bg-[#faf7f0] p-4">
-                  <p className="text-sm font-medium text-ink">
-                    {index + 1}. {index === 2 ? `Ask for ${appointment.advisor} inside` : step}
-                  </p>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 rounded-[1.5rem] bg-[linear-gradient(135deg,#d8cfbf,#f8f4ec)] p-5">
-              <p className="text-sm font-medium text-ink">Buying Center entrance</p>
-              <p className="mt-2 text-sm leading-6 text-black/60">
-                Add a location image or map here if you want visual arrival guidance.
-              </p>
-            </div>
-          </section>
-
-          <section className="rounded-[2rem] border border-black/5 bg-white/80 p-6 shadow-card backdrop-blur">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-black/40">What To Bring</p>
-            <ul className="mt-4 space-y-3 text-sm leading-7 text-black/70">
-              <li>Title (if available)</li>
-              <li>Payoff info (if applicable)</li>
-              <li>Keys</li>
-            </ul>
-          </section>
-        </div>
-
-        <div className="space-y-6">
-          <section className="rounded-[2rem] border border-black/5 bg-white/80 p-6 shadow-card backdrop-blur">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-black/40">Vehicle Snapshot</p>
-            <div className="mt-4 space-y-3 text-sm text-black/70">
-              <div className="flex items-center justify-between gap-4">
-                <span>Vehicle</span>
-                <span className="text-right font-medium text-ink">{appointment.vehicle}</span>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <span>Time</span>
-                <span className="font-medium text-ink">{timeLabel}</span>
-              </div>
-              {appointment.mileage ? (
-                <div className="flex items-center justify-between gap-4">
-                  <span>Mileage</span>
-                  <span className="font-medium text-ink">{appointment.mileage}</span>
-                </div>
-              ) : null}
-            </div>
-            <p className="mt-4 text-sm leading-6 text-black/60">
-              We have already started preparing your appraisal based on what you shared.
-            </p>
-          </section>
-
-          <section className="rounded-[2rem] border border-black/5 bg-white/80 p-6 shadow-card backdrop-blur">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-black/40">What To Expect</p>
-            <p className="mt-3 text-sm leading-7 text-black/65">This usually takes about 30-45 minutes total.</p>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              {expectationSteps.map((item, index) => (
-                <motion.div
-                  key={item.label}
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 * index }}
-                  className="rounded-[1.4rem] border border-black/5 bg-[#faf7f0] p-4"
-                >
-                  <p className="text-sm font-medium text-ink">{item.label}</p>
-                  <p className="mt-2 text-sm text-black/55">{item.time}</p>
-                </motion.div>
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded-[2rem] border border-black/5 bg-white/80 p-6 shadow-card backdrop-blur">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-black/40">What Sellers Say</p>
-            <div className="mt-4 space-y-4">
-              {sellerQuotes.map((item) => (
-                <blockquote key={item.name} className="rounded-[1.5rem] bg-[#faf7f0] p-4 text-sm leading-7 text-black/65">
-                  "{item.quote}"
-                  <footer className="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-black/40">
-                    {item.name}
-                  </footer>
-                </blockquote>
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded-[2rem] border border-black/5 bg-[#1d2a26] p-6 text-white shadow-card">
-            <p className="text-sm leading-7 text-white/80">
-              We&apos;ve reserved this time specifically for you.
-            </p>
-            <button
-              type="button"
-              onClick={handleConfirm}
-              disabled={confirmed || isSubmitting}
-              className="mt-5 w-full rounded-full bg-[#d3a36f] px-5 py-4 text-sm font-medium text-ink transition hover:bg-[#c79660] disabled:cursor-not-allowed disabled:bg-[#b99975]"
+          {toast ? (
+            <motion.p
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-sm leading-7 text-[#234638]"
             >
-              {confirmed ? "You are confirmed" : "I&apos;m planning to be there"}
-            </button>
-            {toast ? (
-              <motion.p
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mt-4 rounded-2xl bg-white/10 px-4 py-3 text-sm text-white"
-              >
-                {toast}
-              </motion.p>
-            ) : null}
-          </section>
-        </div>
-      </section>
+              {toast}
+            </motion.p>
+          ) : null}
+        </section>
+
+        <section>
+          <p className="text-[17px] leading-8 text-[#2e2924]">
+            You&apos;re coming in for your {appointment.vehicle}.
+          </p>
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-2xl font-semibold tracking-[-0.02em] text-[#171512]">When you arrive</h2>
+          <div className="space-y-3">
+            {arrivalSteps.map((step, index) => (
+              <div key={step} className="rounded-[18px] bg-white/55 px-5 py-4">
+                <p className="text-[15px] leading-7 text-[#2e2924]">
+                  {index + 1}. {step}
+                </p>
+              </div>
+            ))}
+            <div className="rounded-[18px] bg-white/55 px-5 py-4">
+              <p className="text-[15px] leading-7 text-[#2e2924]">
+                3. Come inside and ask for {advisorName}
+              </p>
+            </div>
+          </div>
+          <div className="overflow-hidden rounded-[20px]">
+            <div className="aspect-[16/10] w-full bg-[linear-gradient(145deg,#ccb89c,#ede3d4_55%,#d8c4aa)]" />
+          </div>
+          <p className="text-sm text-[#6d6258]">This is where you&apos;ll come in.</p>
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-2xl font-semibold tracking-[-0.02em] text-[#171512]">What to expect</h2>
+          <p className="text-[16px] leading-8 text-[#4d463f]">This usually takes about 30-45 minutes.</p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {expectationSteps.map((step) => (
+              <div key={step.label} className="rounded-[18px] bg-white/55 px-4 py-4">
+                <p className="text-sm font-semibold text-[#171512]">{step.label}</p>
+                <p className="mt-1 text-sm text-[#6b6258]">{step.time}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-2xl font-semibold tracking-[-0.02em] text-[#171512]">What to bring</h2>
+          <ul className="space-y-2 text-[16px] leading-8 text-[#2e2924]">
+            <li>Title (if you have it)</li>
+            <li>Payoff info (if applicable)</li>
+            <li>Keys</li>
+          </ul>
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-2xl font-semibold tracking-[-0.02em] text-[#171512]">
+            What people say after coming in
+          </h2>
+          <div className="space-y-4">
+            {testimonials.map((item) => (
+              <blockquote key={item.name} className="space-y-2">
+                <p className="text-[17px] leading-8 text-[#2e2924]">&ldquo;{item.quote}&rdquo;</p>
+                <footer className="text-sm text-[#766a5f]">- {item.name}</footer>
+              </blockquote>
+            ))}
+          </div>
+        </section>
+
+        <section className="space-y-5 pb-4 text-center">
+          <p className="text-[17px] leading-8 text-[#2e2924]">We&apos;ve set aside time specifically for you.</p>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={confirmed || isSubmitting}
+            className="w-full rounded-[18px] bg-[#234638] px-5 py-4 text-base font-semibold text-white transition hover:bg-[#1d3b2f] disabled:cursor-not-allowed disabled:bg-[#71887d]"
+          >
+            {confirmed ? "I'll be there" : "I'll be there"}
+          </button>
+        </section>
+      </div>
     </main>
   );
 }
