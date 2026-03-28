@@ -28,6 +28,12 @@ export function parseAppointmentTime(input: string, now = new Date()) {
     return applyClock(date, tomorrowMatch[1])?.toISOString() ?? null;
   }
 
+  const directClock = applyClock(startOfDay(now), trimmed);
+
+  if (directClock) {
+    return directClock.toISOString();
+  }
+
   return null;
 }
 

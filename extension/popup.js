@@ -173,7 +173,19 @@ async function generateLink() {
     });
 
     if (!response.ok) {
-      throw new Error("Request failed");
+      let message = "Unable to create link. Check the live deployment.";
+
+      try {
+        const errorBody = await response.json();
+
+        if (errorBody?.error) {
+          message = errorBody.error;
+        }
+      } catch (_error) {
+        // Ignore non-JSON errors.
+      }
+
+      throw new Error(message);
     }
 
     const data = await response.json();
@@ -193,7 +205,7 @@ async function generateLink() {
     setStatus("Link copied - ready to send", "success");
   } catch (error) {
     console.error(error);
-    setStatus("Unable to create link. Check the live deployment.", "error");
+    setStatus(error instanceof Error ? error.message : "Unable to create link. Check the live deployment.", "error");
   } finally {
     generateButton.disabled = false;
   }

@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
   const template = appSettings.templateDefaults || {};
 
   const customerName = body.customer_name?.trim() || body.name?.trim();
-  const advisorName = body.advisor_name?.trim() || body.advisor?.trim();
+  const advisorName = body.advisor_name?.trim() || body.advisor?.trim() || template.advisor_name?.trim();
   const appointmentAt = body.appointment_at || (body.time ? parseAppointmentTime(body.time) : null);
 
   if (!customerName || !body.vehicle?.trim() || !advisorName || !appointmentAt) {
