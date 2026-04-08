@@ -60,22 +60,54 @@ alter table appointments add column if not exists review_photo_urls text[] defau
 alter table appointments add column if not exists customer_delivery_photo_urls text[] default '{}';
 alter table appointments add column if not exists check_handoff_photo_urls text[] default '{}';
 
-update appointments
-set
-  customer_name = coalesce(customer_name, name),
-  appointment_at = coalesce(appointment_at, scheduled_at, created_at),
-  advisor_name = coalesce(advisor_name, advisor),
-  appointment_page_url = coalesce(appointment_page_url, ''),
-  status = coalesce(status, 'scheduled'),
-  calendar_sync_status = coalesce(calendar_sync_status, 'pending'),
-  source = coalesce(source, 'extension')
-where customer_name is null
-   or appointment_at is null
-   or advisor_name is null
-   or appointment_page_url is null
-   or status is null
-   or calendar_sync_status is null
-   or source is null;
+do $$
+declare
+  has_name boolean;
+  has_scheduled_at boolean;
+  has_advisor boolean;
+begin
+  select exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public' and table_name = 'appointments' and column_name = 'name'
+  ) into has_name;
+
+  select exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public' and table_name = 'appointments' and column_name = 'scheduled_at'
+  ) into has_scheduled_at;
+
+  select exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public' and table_name = 'appointments' and column_name = 'advisor'
+  ) into has_advisor;
+
+  if has_name or has_scheduled_at or has_advisor then
+    execute format(
+      'update appointments
+       set
+         customer_name = coalesce(customer_name, %s),
+         appointment_at = coalesce(appointment_at, %s, created_at),
+         advisor_name = coalesce(advisor_name, %s),
+         appointment_page_url = coalesce(appointment_page_url, ''''),
+         status = coalesce(status, ''scheduled''),
+         calendar_sync_status = coalesce(calendar_sync_status, ''pending''),
+         source = coalesce(source, ''extension'')
+       where customer_name is null
+          or appointment_at is null
+          or advisor_name is null
+          or appointment_page_url is null
+          or status is null
+          or calendar_sync_status is null
+          or source is null',
+      case when has_name then 'name' else 'customer_name' end,
+      case when has_scheduled_at then 'scheduled_at' else 'appointment_at' end,
+      case when has_advisor then 'advisor' else 'advisor_name' end
+    );
+  end if;
+end $$;
 
 create table if not exists appointment_events (
   id uuid primary key,

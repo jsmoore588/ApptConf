@@ -5,6 +5,18 @@ import { Appointment, AppointmentEvent, AppointmentEventType, AppointmentStatus 
 export type AppointmentPriority = "high" | "normal" | "low";
 
 function getStatus(appointment: Appointment): AppointmentStatus {
+  if (appointment.status === "canceled") {
+    return "canceled";
+  }
+
+  if (appointment.status === "reschedule_requested") {
+    return "reschedule_requested";
+  }
+
+  if (appointment.status === "running_late") {
+    return "running_late";
+  }
+
   if (appointment.confirmed || appointment.status === "confirmed") {
     return "confirmed";
   }
@@ -21,8 +33,14 @@ function getStatus(appointment: Appointment): AppointmentStatus {
 }
 
 function getPriority(appointment: Appointment): AppointmentPriority {
-  if (getStatus(appointment) === "confirmed") {
+  const status = getStatus(appointment);
+
+  if (status === "confirmed") {
     return "low";
+  }
+
+  if (status === "running_late" || status === "reschedule_requested" || status === "canceled") {
+    return "high";
   }
 
   const hours = hoursUntil(appointment.appointment_at);
@@ -199,6 +217,15 @@ export async function getDashboardMetrics() {
     .sort((a, b) => (a.appointment_at || "").localeCompare(b.appointment_at || ""));
 
   const suggestions = [
+    appointments.some((appointment) => appointment.status === "reschedule_requested")
+      ? "Follow up on reschedule requests first so they do not become silent no-shows."
+      : null,
+    appointments.some((appointment) => appointment.status === "running_late")
+      ? "Watch running-late appointments closely and adjust timing before they slip."
+      : null,
+    appointments.some((appointment) => appointment.status === "canceled")
+      ? "Canceled appointments should be recovered quickly with a replacement time."
+      : null,
     appointments.some(
       (appointment) => appointment.priority === "high" && appointment.status === "scheduled"
     )
@@ -342,6 +369,23 @@ export async function registerEvent(
     nextPatch.confirmed_at = timestamp;
     nextPatch.engagement_score = Math.min((appointment.engagement_score ?? 0) + 35, 100);
     nextPatch.status = "confirmed";
+  }
+
+  if (type === "running_late_clicked") {
+    nextPatch.status = "running_late";
+    nextPatch.engagement_score = Math.min((appointment.engagement_score ?? 0) + 10, 100);
+  }
+
+  if (type === "reschedule_requested_clicked") {
+    nextPatch.status = "reschedule_requested";
+    nextPatch.confirmed = false;
+    nextPatch.engagement_score = Math.min((appointment.engagement_score ?? 0) + 8, 100);
+  }
+
+  if (type === "cant_make_it_clicked") {
+    nextPatch.status = "canceled";
+    nextPatch.confirmed = false;
+    nextPatch.engagement_score = Math.min((appointment.engagement_score ?? 0) + 5, 100);
   }
 
   const updatedAppointment =

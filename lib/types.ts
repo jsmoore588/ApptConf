@@ -8,6 +8,9 @@ export type AppointmentStatus =
   | "scheduled"
   | "confirmed"
   | "viewed"
+  | "running_late"
+  | "reschedule_requested"
+  | "canceled"
   | "not_opened"
   | "calendar_sync_failed";
 
@@ -52,7 +55,12 @@ export type Appointment = {
   check_handoff_photo_urls?: string[];
 };
 
-export type AppointmentEventType = "page_opened" | "confirm_clicked";
+export type AppointmentEventType =
+  | "page_opened"
+  | "confirm_clicked"
+  | "running_late_clicked"
+  | "reschedule_requested_clicked"
+  | "cant_make_it_clicked";
 
 export type AppointmentEvent = {
   id: string;

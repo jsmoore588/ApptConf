@@ -8,8 +8,15 @@ export async function POST(
 ) {
   const { id } = await context.params;
   const body = (await request.json()) as { type?: AppointmentEventType };
+  const validTypes: AppointmentEventType[] = [
+    "page_opened",
+    "confirm_clicked",
+    "running_late_clicked",
+    "reschedule_requested_clicked",
+    "cant_make_it_clicked"
+  ];
 
-  if (!body.type || !["page_opened", "confirm_clicked"].includes(body.type)) {
+  if (!body.type || !validTypes.includes(body.type)) {
     return NextResponse.json({ error: "Invalid event type" }, { status: 400 });
   }
 

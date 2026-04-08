@@ -1,12 +1,14 @@
-const API_BASE_URL = "https://appointment-confirmation-seven.vercel.app";
+const DEFAULT_API_BASE_URL = "http://localhost:6767";
 const DEFAULT_LOCATION_NAME = "Bullard Buying Center";
 const DEFAULT_LOCATION_ADDRESS = "1147 E. I65 Service Rd., Mobile, AL 36606";
 
 const ids = [
   "name",
   "vehicle",
-  "time",
+  "appointmentDate",
+  "appointmentTime",
   "email",
+  "apiBaseUrl",
   "advisor",
   "advisorPhone",
   "advisorPhotoUrl",
@@ -43,11 +45,21 @@ function collectFeaturedReviews() {
   ].filter((item) => item.review_text && item.reviewer_name);
 }
 
+function buildAppointmentAt(dateValue, timeValue) {
+  if (!dateValue || !timeValue) {
+    return null;
+  }
+
+  const iso = new Date(`${dateValue}T${timeValue}:00`);
+  return Number.isNaN(iso.getTime()) ? null : iso.toISOString();
+}
+
 async function restoreSettings() {
   const storage = await chrome.storage.local.get([
     "openTab",
     "draftName",
     "draftVehicle",
+    "apiBaseUrl",
     "presetAdvisor",
     "presetAdvisorPhone",
     "presetAdvisorPhotoUrl",
@@ -65,6 +77,7 @@ async function restoreSettings() {
     "presetReviewer3"
   ]);
 
+  elements.apiBaseUrl.value = storage.apiBaseUrl || DEFAULT_API_BASE_URL;
   elements.advisor.value = storage.presetAdvisor || "Jude";
   elements.advisorPhone.value = storage.presetAdvisorPhone || "";
   elements.advisorPhotoUrl.value = storage.presetAdvisorPhotoUrl || "";
@@ -115,6 +128,7 @@ async function restoreSettings() {
 
 async function savePresets() {
   await chrome.storage.local.set({
+    apiBaseUrl: elements.apiBaseUrl.value.trim() || DEFAULT_API_BASE_URL,
     presetAdvisor: elements.advisor.value.trim(),
     presetAdvisorPhone: elements.advisorPhone.value.trim(),
     presetAdvisorPhotoUrl: elements.advisorPhotoUrl.value.trim(),
@@ -137,10 +151,12 @@ async function savePresets() {
 }
 
 async function generateLink() {
+  const apiBaseUrl = (elements.apiBaseUrl.value.trim() || DEFAULT_API_BASE_URL).replace(/\/$/, "");
+  const appointmentAt = buildAppointmentAt(elements.appointmentDate.value, elements.appointmentTime.value);
   const payload = {
     name: elements.name.value.trim(),
     vehicle: elements.vehicle.value.trim(),
-    time: elements.time.value.trim(),
+    appointment_at: appointmentAt,
     email: elements.email.value.trim(),
     advisor: elements.advisor.value.trim() || "Jude",
     advisor_name: elements.advisor.value.trim() || "Jude",
@@ -157,8 +173,8 @@ async function generateLink() {
     featured_reviews: collectFeaturedReviews()
   };
 
-  if (!payload.name || !payload.vehicle || !payload.time) {
-    setStatus("Name, vehicle, and time are required.", "error");
+  if (!payload.name || !payload.vehicle || !payload.appointment_at) {
+    setStatus("Name, vehicle, date, and clock time are required.", "error");
     return;
   }
 
@@ -166,7 +182,7 @@ async function generateLink() {
   setStatus("Generating link...");
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/create-appointment`, {
+    const response = await fetch(`${apiBaseUrl}/api/create-appointment`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -191,6 +207,7 @@ async function generateLink() {
     const data = await response.json();
     await navigator.clipboard.writeText(data.url);
     await chrome.storage.local.set({
+      apiBaseUrl,
       draftName: payload.name,
       draftVehicle: payload.vehicle,
       openTab: elements.openTab.checked

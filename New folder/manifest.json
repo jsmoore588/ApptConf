@@ -1,0 +1,9 @@
+{  "manifest_version": 3,
+  "name": "Appointment Engine Link Generator",
+  "version": "1.0",
+  "description": "Generate appointment links instantly.",
+  "permissions": ["clipboardWrite", "activeTab"],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}

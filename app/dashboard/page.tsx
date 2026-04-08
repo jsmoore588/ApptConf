@@ -94,7 +94,7 @@ export default async function DashboardPage() {
           <SectionHeader
             eyebrow="Today"
             title="Appointments scheduled for today"
-            subtitle="Status is driven by opens and confirmation clicks."
+            subtitle="Status reflects confirmations, late arrivals, reschedule requests, and cancellations."
           />
         <div className="mt-5 grid gap-4">
           {dashboard.todayAppointments.length > 0 ? (
@@ -178,7 +178,15 @@ function AppointmentCard({
     google_calendar_event_id?: string;
     created_at: string;
     source?: string;
-    status: "scheduled" | "confirmed" | "viewed" | "not_opened" | "calendar_sync_failed";
+    status:
+      | "scheduled"
+      | "confirmed"
+      | "viewed"
+      | "running_late"
+      | "reschedule_requested"
+      | "canceled"
+      | "not_opened"
+      | "calendar_sync_failed";
     priority: "high" | "normal" | "low";
     phone?: string;
     advisor_phone?: string;
@@ -189,6 +197,12 @@ function AppointmentCard({
   const statusTone =
     appointment.status === "confirmed"
       ? "bg-[#d6e7db] text-[#224735]"
+      : appointment.status === "running_late"
+        ? "bg-[#f3e3c9] text-[#835628]"
+        : appointment.status === "reschedule_requested"
+          ? "bg-[#e7ddf3] text-[#5f3c82]"
+          : appointment.status === "canceled"
+            ? "bg-[#f0ddda] text-[#8b3d34]"
       : appointment.status === "scheduled"
         ? "bg-[#e5e2dd] text-[#4b4640]"
         : appointment.status === "calendar_sync_failed"

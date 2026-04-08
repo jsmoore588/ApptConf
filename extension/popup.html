@@ -9,37 +9,66 @@
   <body>
     <main class="shell">
       <section class="card">
-        <div class="eyebrow">Appointment Engine</div>
-        <h1>Generate appointment link</h1>
-        <p class="subtle">Quick customer details up top. Presets and trust content tucked underneath.</p>
+        <div class="hero">
+          <div class="hero-copy">
+            <div class="eyebrow">Appointment Engine</div>
+            <h1>Build a customer-ready appointment page</h1>
+            <p class="subtle">
+              Clean contact details, a real appointment time, and one-click link generation.
+            </p>
+          </div>
+          <div class="hero-chip">Local mode</div>
+        </div>
 
-        <label>
-          <span>Name</span>
-          <input id="name" type="text" placeholder="Customer name" />
-        </label>
+        <div class="panel">
+          <p class="section-title">Customer</p>
 
-        <label>
-          <span>Vehicle</span>
-          <input id="vehicle" type="text" placeholder="Vehicle details" />
-        </label>
+          <label>
+            <span>Name</span>
+            <input id="name" type="text" placeholder="Customer name" />
+          </label>
 
-        <label>
-          <span>Time</span>
-          <input id="time" type="text" placeholder="Today at 3:30 PM" />
-        </label>
+          <label>
+            <span>Vehicle</span>
+            <input id="vehicle" type="text" placeholder="Vehicle details" />
+          </label>
 
-        <label>
-          <span>Email (optional)</span>
-          <input id="email" type="email" placeholder="seller@example.com" />
-        </label>
+          <div class="time-grid">
+            <label>
+              <span>Date</span>
+              <input id="appointmentDate" type="date" />
+            </label>
 
-        <label>
-          <span>Advisor</span>
-          <input id="advisor" type="text" value="Jude" />
-        </label>
+            <label>
+              <span>Clock Time</span>
+              <input id="appointmentTime" type="time" />
+            </label>
+          </div>
+
+          <p class="input-note">Use these two fields together so the appointment time is saved accurately.</p>
+
+          <label>
+            <span>Email (optional)</span>
+            <input id="email" type="email" placeholder="seller@example.com" />
+          </label>
+        </div>
+
+        <div class="panel">
+          <p class="section-title">Advisor</p>
+
+          <label>
+            <span>Advisor</span>
+            <input id="advisor" type="text" value="Jude" />
+          </label>
+
+          <label>
+            <span>API base URL</span>
+            <input id="apiBaseUrl" type="url" placeholder="http://localhost:6767" />
+          </label>
+        </div>
 
         <details class="details">
-          <summary>More Options</summary>
+          <summary>Arrival + Trust Content</summary>
 
           <div class="details-body">
             <p class="section-label">Saved Presets</p>
@@ -125,7 +154,10 @@
           <span>Open appointment page after generation</span>
         </label>
 
-        <button id="generate">Generate Appointment Link</button>
+        <div class="actions">
+          <button id="generate">Generate Appointment Link</button>
+          <button id="savePresets" type="button" class="secondary">Save Presets</button>
+        </div>
         <p id="status" class="status"></p>
       </section>
     </main>
