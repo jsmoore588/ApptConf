@@ -60,6 +60,51 @@ function createGoogleCalendarLink(appointment: Appointment, startLabel: string) 
   return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${dateText}&details=${details}&location=${location}`;
 }
 
+function createReminderFile(appointment: Appointment, startLabel: string) {
+  if (!appointment.appointment_at) {
+    return null;
+  }
+
+  const start = new Date(appointment.appointment_at);
+  const end = new Date(start);
+  end.setHours(end.getHours() + 1);
+  const safeName = (appointment.name || "appointment").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Appointment Engine//EN",
+    "BEGIN:VEVENT",
+    `UID:${appointment.id}@appointment-engine`,
+    `DTSTAMP:${toGoogleDate(new Date())}`,
+    `DTSTART:${toGoogleDate(start)}`,
+    `DTEND:${toGoogleDate(end)}`,
+    `SUMMARY:Appointment for ${escapeIcsText(appointment.name)}`,
+    `DESCRIPTION:${escapeIcsText(`Vehicle: ${appointment.vehicle}\\nTime: ${startLabel}\\nAdvisor: ${appointment.advisor_name || appointment.advisor || "Advisor"}`)}`,
+    `LOCATION:${escapeIcsText(appointment.location_address || appointment.location_name || `${DEFAULT_LOCATION_NAME}, ${DEFAULT_LOCATION_ADDRESS}`)}`,
+    "BEGIN:VALARM",
+    "TRIGGER:-PT2H",
+    "ACTION:DISPLAY",
+    "DESCRIPTION:Appointment reminder",
+    "END:VALARM",
+    "BEGIN:VALARM",
+    "TRIGGER:-PT30M",
+    "ACTION:DISPLAY",
+    "DESCRIPTION:Appointment reminder",
+    "END:VALARM",
+    "END:VEVENT",
+    "END:VCALENDAR"
+  ];
+
+  return {
+    filename: `${safeName || "appointment"}-reminder.ics`,
+    content: lines.join("\r\n")
+  };
+}
+
+function escapeIcsText(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
+}
+
 function toGoogleDate(value: Date) {
   return value.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
 }
@@ -167,6 +212,7 @@ export function AppointmentPage({ appointment }: Props) {
     ...(appointment.check_handoff_photo_urls ?? [])
   ];
   const calendarLink = useMemo(() => createGoogleCalendarLink(appointment, timeLabel), [appointment, timeLabel]);
+  const reminderFile = useMemo(() => createReminderFile(appointment, timeLabel), [appointment, timeLabel]);
   const contactPhone = appointment.advisor_phone;
   const mapsLink =
     appointment.google_maps_url ||
@@ -240,6 +286,24 @@ export function AppointmentPage({ appointment }: Props) {
     }
   }
 
+  function handleDownloadReminder() {
+    if (!reminderFile) {
+      setToast("A scheduled appointment time is required before a reminder can be added.");
+      return;
+    }
+
+    const blob = new Blob([reminderFile.content], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = reminderFile.filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+    setToast("Reminder file downloaded. Open it to add the appointment to your reminders or calendar.");
+  }
+
   return (
     <main className={`${bodyFont.className} min-h-screen bg-transparent px-4 py-5 text-[#1a1a1a] sm:px-6 sm:py-8`}>
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
@@ -301,6 +365,13 @@ export function AppointmentPage({ appointment }: Props) {
                     Add to Calendar
                   </a>
                 ) : null}
+                <button
+                  type="button"
+                  onClick={handleDownloadReminder}
+                  className="inline-flex min-h-14 items-center justify-center rounded-full border border-[#d8c8b3] bg-white/72 px-5 text-sm font-semibold text-[#25231e] transition hover:bg-white"
+                >
+                  Add Reminder
+                </button>
                 <a
                   href={mapsLink}
                   target="_blank"
