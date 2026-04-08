@@ -26,6 +26,8 @@ create table if not exists appointments (
   first_opened_at timestamptz,
   confirmed_at timestamptz,
   engagement_score integer not null default 0,
+  reminder_2hr_sent boolean not null default false,
+  reminder_30min_sent boolean not null default false,
   location_name text,
   location_address text,
   google_maps_url text,
@@ -59,6 +61,8 @@ alter table appointments add column if not exists featured_reviews jsonb default
 alter table appointments add column if not exists review_photo_urls text[] default '{}';
 alter table appointments add column if not exists customer_delivery_photo_urls text[] default '{}';
 alter table appointments add column if not exists check_handoff_photo_urls text[] default '{}';
+alter table appointments add column if not exists reminder_2hr_sent boolean not null default false;
+alter table appointments add column if not exists reminder_30min_sent boolean not null default false;
 
 do $$
 declare
@@ -119,6 +123,17 @@ create table if not exists appointment_events (
 
 create index if not exists appointment_events_appointment_id_idx on appointment_events (appointment_id);
 create index if not exists appointments_appointment_at_idx on appointments (appointment_at);
+
+insert into storage.buckets (id, name, public)
+values ('appointment-assets', 'appointment-assets', true)
+on conflict (id) do update set public = excluded.public;
+
+drop policy if exists "appointment assets public read" on storage.objects;
+create policy "appointment assets public read"
+on storage.objects
+for select
+to public
+using (bucket_id = 'appointment-assets');
 
 create table if not exists app_settings (
   key text primary key,

@@ -33,7 +33,7 @@ export default async function DashboardPage() {
               Dashboard
             </p>
             <h1 className="mt-2 text-3xl font-semibold text-ink md:text-5xl">
-              Today, tomorrow, and who needs attention now
+              Every appointment, with the urgent ones surfaced first
             </h1>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -105,6 +105,23 @@ export default async function DashboardPage() {
               <EmptyState label="No appointments on today's board." />
             )}
           </div>
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-[2rem] border border-black/5 bg-white/75 p-6 shadow-card backdrop-blur">
+        <SectionHeader
+          eyebrow="All Appointments"
+          title="Full appointment list"
+          subtitle="This shows every appointment in the database, not just today's board."
+        />
+        <div className="mt-5 grid gap-4">
+          {dashboard.allAppointments.length > 0 ? (
+            dashboard.allAppointments.map((appointment) => (
+              <AppointmentCard key={appointment.id} appointment={appointment} />
+            ))
+          ) : (
+            <EmptyState label="No appointments found yet." />
+          )}
         </div>
       </section>
 

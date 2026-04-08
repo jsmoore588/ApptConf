@@ -90,6 +90,8 @@ function mapAppointment(row: Record<string, unknown>) {
     first_opened_at: (row.first_opened_at as string | null) ?? undefined,
     confirmed_at: (row.confirmed_at as string | null) ?? undefined,
     engagement_score: Number(row.engagement_score ?? 0),
+    reminder_2hr_sent: Boolean(row.reminder_2hr_sent),
+    reminder_30min_sent: Boolean(row.reminder_30min_sent),
     location_name: (row.location_name as string | null) ?? undefined,
     location_address: (row.location_address as string | null) ?? undefined,
     google_maps_url: (row.google_maps_url as string | null) ?? undefined,
@@ -129,6 +131,8 @@ function toDatabaseAppointment(appointment: Appointment) {
     first_opened_at: appointment.first_opened_at ?? null,
     confirmed_at: appointment.confirmed_at ?? null,
     engagement_score: appointment.engagement_score ?? 0,
+    reminder_2hr_sent: appointment.reminder_2hr_sent ?? false,
+    reminder_30min_sent: appointment.reminder_30min_sent ?? false,
     location_name: appointment.location_name ?? null,
     location_address: appointment.location_address ?? null,
     google_maps_url: appointment.google_maps_url ?? null,
@@ -246,6 +250,7 @@ export async function getDashboardMetrics() {
     showRate:
       totalAppointments === 0 ? 0 : Math.round((totalConfirmations / totalAppointments) * 100),
     suggestions,
+    allAppointments: appointments,
     todayAppointments,
     tomorrowAppointments,
     overdueAppointments
@@ -304,6 +309,8 @@ export async function updateAppointment(id: string, partial: Partial<Appointment
   if (partial.first_opened_at !== undefined) payload.first_opened_at = partial.first_opened_at;
   if (partial.confirmed_at !== undefined) payload.confirmed_at = partial.confirmed_at;
   if (partial.engagement_score !== undefined) payload.engagement_score = partial.engagement_score;
+  if (partial.reminder_2hr_sent !== undefined) payload.reminder_2hr_sent = partial.reminder_2hr_sent;
+  if (partial.reminder_30min_sent !== undefined) payload.reminder_30min_sent = partial.reminder_30min_sent;
 
   const { data, error } = await supabase
     .from("appointments")

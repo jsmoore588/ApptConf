@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Cormorant_Garamond, Plus_Jakarta_Sans } from "next/font/google";
 import { AnimatePresence, motion } from "framer-motion";
 import { Appointment } from "@/lib/types";
 import { formatAppointmentDate } from "@/lib/datetime";
@@ -9,6 +10,16 @@ import { DEFAULT_LOCATION_ADDRESS, DEFAULT_LOCATION_NAME } from "@/lib/constants
 type Props = {
   appointment: Appointment;
 };
+
+const displayFont = Cormorant_Garamond({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"]
+});
+
+const bodyFont = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"]
+});
 
 const arrivalSteps = [
   "Pull into the front lot",
@@ -90,6 +101,47 @@ function formatDayTime(dateText?: string) {
   }).format(date);
 }
 
+function formatDayLabel(dateText?: string) {
+  if (!dateText) {
+    return null;
+  }
+
+  const date = new Date(dateText);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    weekday: "long",
+    month: "long",
+    day: "numeric"
+  }).format(date);
+}
+
+function SafeImage({
+  src,
+  alt,
+  className,
+  fallbackClassName,
+  fallbackLabel
+}: {
+  src?: string;
+  alt: string;
+  className: string;
+  fallbackClassName: string;
+  fallbackLabel: string;
+}) {
+  const [failed, setFailed] = useState(!src);
+
+  if (!src || failed) {
+    return <div className={fallbackClassName}>{fallbackLabel}</div>;
+  }
+
+  return <img src={src} alt={alt} className={className} onError={() => setFailed(true)} />;
+}
+
 export function AppointmentPage({ appointment }: Props) {
   const [confirmed, setConfirmed] = useState(Boolean(appointment.confirmed));
   const [toast, setToast] = useState<string | null>(null);
@@ -104,6 +156,7 @@ export function AppointmentPage({ appointment }: Props) {
   const timeLabel = appointment.appointment_at ? formatAppointmentDate(appointment.appointment_at) : appointment.time;
   const shortTime = formatShortTime(appointment.appointment_at) || appointment.time || timeLabel;
   const dayTime = formatDayTime(appointment.appointment_at);
+  const dayLabel = formatDayLabel(appointment.appointment_at);
   const entrancePhotos = appointment.entrance_photo_urls ?? [];
   const reviews = appointment.featured_reviews ?? [];
   const featuredReviews = reviews.slice(0, 3);
@@ -188,7 +241,7 @@ export function AppointmentPage({ appointment }: Props) {
   }
 
   return (
-    <main className="min-h-screen bg-transparent px-4 py-5 text-[#1a1a1a] sm:px-6 sm:py-8">
+    <main className={`${bodyFont.className} min-h-screen bg-transparent px-4 py-5 text-[#1a1a1a] sm:px-6 sm:py-8`}>
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
         <section className="relative overflow-hidden rounded-[2rem] border border-[#e4d8ca] bg-[linear-gradient(135deg,#f7f1e7_0%,#f1e8da_55%,#eadfce_100%)] p-6 shadow-[0_30px_80px_rgba(48,36,25,0.14)] sm:p-8">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(186,135,77,0.22),transparent_30%),radial-gradient(circle_at_88%_18%,rgba(31,73,60,0.18),transparent_24%)]" />
@@ -200,7 +253,7 @@ export function AppointmentPage({ appointment }: Props) {
               </div>
 
               <div className="space-y-3">
-                <h1 className="max-w-3xl font-serif text-4xl leading-[0.98] tracking-[-0.04em] text-[#171512] sm:text-5xl md:text-6xl">
+                <h1 className={`${displayFont.className} max-w-3xl text-4xl leading-[0.94] tracking-[-0.05em] text-[#171512] sm:text-5xl md:text-6xl`}>
                   {advisorName} will be ready for you at {shortTime}.
                 </h1>
                 <p className="max-w-2xl text-[17px] leading-8 text-[#4f463d]">
@@ -212,7 +265,8 @@ export function AppointmentPage({ appointment }: Props) {
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-[1.25rem] border border-white/45 bg-white/55 p-4 backdrop-blur">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#86694b]">Appointment</p>
-                  <p className="mt-2 text-sm leading-6 text-[#29251f]">{dayTime || timeLabel}</p>
+                  <p className="mt-2 text-sm leading-6 text-[#29251f]">{dayLabel || dayTime || timeLabel}</p>
+                  {dayLabel ? <p className="text-xs text-[#776a5e]">{shortTime}</p> : null}
                 </div>
                 <div className="rounded-[1.25rem] border border-white/45 bg-white/55 p-4 backdrop-blur">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#86694b]">Vehicle</p>
@@ -257,6 +311,18 @@ export function AppointmentPage({ appointment }: Props) {
                 </a>
               </div>
 
+              <div className="flex flex-wrap gap-2 text-[11px] font-medium uppercase tracking-[0.16em] text-[#756858]">
+                <span className="rounded-full border border-white/40 bg-white/45 px-3 py-2 backdrop-blur">
+                  Time already reserved
+                </span>
+                <span className="rounded-full border border-white/40 bg-white/45 px-3 py-2 backdrop-blur">
+                  Arrival steps below
+                </span>
+                <span className="rounded-full border border-white/40 bg-white/45 px-3 py-2 backdrop-blur">
+                  Direct contact built in
+                </span>
+              </div>
+
               {toast ? (
                 <motion.p
                   initial={{ opacity: 0, y: 8 }}
@@ -271,23 +337,19 @@ export function AppointmentPage({ appointment }: Props) {
             <div className="rounded-[1.8rem] border border-white/40 bg-[#16382d] p-5 text-white shadow-[0_20px_55px_rgba(14,31,25,0.24)] sm:p-6">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/50">Your advisor</p>
               <div className="mt-4 flex items-center gap-4">
-            {appointment.advisor_photo_url ? (
-              <img
-                src={appointment.advisor_photo_url}
-                alt={advisorName}
-                className="h-16 w-16 rounded-[1.15rem] object-cover ring-2 ring-white/15"
-              />
-            ) : (
-              <div className="flex h-16 w-16 items-center justify-center rounded-[1.15rem] bg-white/10 text-2xl font-semibold text-white">
-                {advisorName.slice(0, 1)}
-              </div>
-            )}
-              <div>
-                <p className="text-2xl font-semibold">{advisorName}</p>
-                <p className="mt-1 text-sm leading-7 text-white/72">
-                  I&apos;ll already have your visit lined up when you get here.
-                </p>
-              </div>
+                <SafeImage
+                  src={appointment.advisor_photo_url}
+                  alt={advisorName}
+                  className="h-16 w-16 rounded-[1.15rem] object-cover ring-2 ring-white/15"
+                  fallbackClassName="flex h-16 w-16 items-center justify-center rounded-[1.15rem] bg-white/10 text-2xl font-semibold text-white"
+                  fallbackLabel={advisorName.slice(0, 1)}
+                />
+                <div>
+                  <p className="text-2xl font-semibold">{advisorName}</p>
+                  <p className="mt-1 text-sm leading-7 text-white/72">
+                    I&apos;ll already have your visit lined up when you get here.
+                  </p>
+                </div>
               </div>
 
               <div className="mt-6 space-y-3">
@@ -336,7 +398,7 @@ export function AppointmentPage({ appointment }: Props) {
 
         <section className="rounded-[1.75rem] border border-[#e3d7c8] bg-white/78 p-6 shadow-[0_18px_42px_rgba(45,35,24,0.07)]">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8a6f50]">Arrival</p>
-          <h2 className="mt-2 font-serif text-3xl tracking-[-0.03em] text-[#171512]">When you arrive</h2>
+          <h2 className={`${displayFont.className} mt-2 text-3xl tracking-[-0.03em] text-[#171512]`}>When you arrive</h2>
           <p className="mt-3 text-sm leading-7 text-[#61564b]">
             Everything below is meant to remove uncertainty before you get here.
           </p>
@@ -372,10 +434,12 @@ export function AppointmentPage({ appointment }: Props) {
                 onClick={() => setActiveGallery({ images: entrancePhotos, index: 0 })}
                 className="block w-full overflow-hidden rounded-[1.5rem] border border-[#eadfce] text-left shadow-[0_10px_28px_rgba(26,26,26,0.06)] transition hover:scale-[1.01] active:scale-[0.995]"
               >
-                <img
+                <SafeImage
                   src={entrancePhotos[0]}
                   alt="Building entrance"
                   className="aspect-[16/10] w-full object-cover"
+                  fallbackClassName="flex aspect-[16/10] w-full items-center justify-center bg-[#efe6d9] text-sm font-medium text-[#6c6258]"
+                  fallbackLabel="Entrance photo unavailable"
                 />
               </button>
               <p className="text-sm text-[#6d6258]">This is where you&apos;ll come in</p>
@@ -405,7 +469,7 @@ export function AppointmentPage({ appointment }: Props) {
 
         <section className="rounded-[1.75rem] border border-[#e3d7c8] bg-white/78 p-6 shadow-[0_18px_42px_rgba(45,35,24,0.07)]">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8a6f50]">Visit</p>
-          <h2 className="mt-2 font-serif text-3xl tracking-[-0.03em] text-[#171512]">What to expect</h2>
+          <h2 className={`${displayFont.className} mt-2 text-3xl tracking-[-0.03em] text-[#171512]`}>What to expect</h2>
           <p className="mt-3 text-[16px] leading-8 text-[#4d463f]">This usually takes about 30 to 45 minutes.</p>
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
             {expectationSteps.map((step) => (
@@ -438,7 +502,7 @@ export function AppointmentPage({ appointment }: Props) {
 
         <section className="rounded-[1.75rem] border border-[#e3d7c8] bg-white/78 p-6 shadow-[0_18px_42px_rgba(45,35,24,0.07)]">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8a6f50]">Bring</p>
-          <h2 className="mt-2 font-serif text-3xl tracking-[-0.03em] text-[#171512]">What to bring</h2>
+          <h2 className={`${displayFont.className} mt-2 text-3xl tracking-[-0.03em] text-[#171512]`}>What to bring</h2>
           <div className="mt-5 space-y-2">
             {bringItems.map((item) => (
               <button
@@ -470,7 +534,7 @@ export function AppointmentPage({ appointment }: Props) {
         {(featuredReviews.length > 0 || appointment.google_reviews_url || appointment.yelp_reviews_url) ? (
           <section className="rounded-[1.75rem] border border-[#e3d7c8] bg-white/78 p-6 shadow-[0_18px_42px_rgba(45,35,24,0.07)]">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8a6f50]">Trust</p>
-            <h2 className="mt-2 font-serif text-3xl tracking-[-0.03em] text-[#171512]">
+            <h2 className={`${displayFont.className} mt-2 text-3xl tracking-[-0.03em] text-[#171512]`}>
               What people say after coming in
             </h2>
 
@@ -532,7 +596,13 @@ export function AppointmentPage({ appointment }: Props) {
                     onClick={() => setActiveGallery({ images: trustImages, index })}
                     className="h-24 min-w-32 overflow-hidden rounded-[1.15rem] border border-[#ece2d3] shadow-[0_8px_24px_rgba(26,26,26,0.04)]"
                   >
-                    <img src={image} alt="Customer visit" className="h-full w-full object-cover" />
+                    <SafeImage
+                      src={image}
+                      alt="Customer visit"
+                      className="h-full w-full object-cover"
+                      fallbackClassName="flex h-full w-full items-center justify-center bg-[#efe6d9] px-3 text-center text-xs font-medium text-[#6c6258]"
+                      fallbackLabel="Image unavailable"
+                    />
                   </button>
                 ))}
               </div>
@@ -542,7 +612,7 @@ export function AppointmentPage({ appointment }: Props) {
 
         <section className="rounded-[1.65rem] border border-[#e6ddcf] bg-[#f7f3ec] px-6 py-6 text-[#2a2722] shadow-[0_12px_28px_rgba(45,35,24,0.05)]">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8a6f50]">Support</p>
-          <h2 className="mt-2 font-serif text-3xl tracking-[-0.03em] text-[#171512]">Something come up?</h2>
+          <h2 className={`${displayFont.className} mt-2 text-3xl tracking-[-0.03em] text-[#171512]`}>Something come up?</h2>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-[#62574b]">
             If plans changed, send a quick update so we can adjust instead of losing the appointment.
           </p>
@@ -553,7 +623,7 @@ export function AppointmentPage({ appointment }: Props) {
               onClick={() =>
                 handleSupportAction({
                   type: "reschedule_requested_clicked",
-                  message: "Hey, something came up — can we move this to a later time?",
+                  message: "Hey, something came up - can we move this to a later time?",
                   toastMessage: "We opened a reschedule message so you can shift the appointment quickly."
                 })
               }
@@ -569,7 +639,7 @@ export function AppointmentPage({ appointment }: Props) {
               onClick={() =>
                 handleSupportAction({
                   type: "running_late_clicked",
-                  message: "Hey, I’m running a few minutes behind but still coming.",
+                  message: "Hey, I'm running a few minutes behind but still coming.",
                   toastMessage: "We opened a running-late message so the store gets a heads-up."
                 })
               }
@@ -585,7 +655,7 @@ export function AppointmentPage({ appointment }: Props) {
               onClick={() =>
                 handleSupportAction({
                   type: "cant_make_it_clicked",
-                  message: "Hey, I won’t be able to make it today. Can we reschedule?",
+                  message: "Hey, I won't be able to make it today. Can we reschedule?",
                   toastMessage: "We opened a message so you can reschedule instead of disappearing."
                 })
               }
@@ -600,7 +670,7 @@ export function AppointmentPage({ appointment }: Props) {
 
         <section className="rounded-[1.85rem] border border-[#ddd0bf] bg-[#173d33] px-6 py-7 text-center text-white shadow-[0_24px_55px_rgba(18,44,36,0.28)]">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/55">Final confirmation</p>
-          <h2 className="mt-3 font-serif text-3xl tracking-[-0.03em] text-white sm:text-4xl">
+          <h2 className={`${displayFont.className} mt-3 text-3xl tracking-[-0.03em] text-white sm:text-4xl`}>
             We have time set aside specifically for you.
           </h2>
           <p className="mx-auto mt-3 max-w-2xl text-[17px] leading-8 text-white/74">
@@ -635,10 +705,12 @@ export function AppointmentPage({ appointment }: Props) {
               className="w-full max-w-3xl rounded-[24px] bg-[#f4ede0] p-4 shadow-2xl"
               onClick={(event) => event.stopPropagation()}
             >
-              <img
+              <SafeImage
                 src={activeGallery.images[activeGallery.index]}
                 alt="Appointment reference"
                 className="aspect-[16/10] w-full rounded-[18px] object-cover"
+                fallbackClassName="flex aspect-[16/10] w-full items-center justify-center rounded-[18px] bg-[#efe6d9] text-sm font-medium text-[#6c6258]"
+                fallbackLabel="Image unavailable"
               />
               {activeGallery.images.length > 1 ? (
                 <div className="mt-4 flex items-center justify-between gap-3">
@@ -695,7 +767,7 @@ export function AppointmentPage({ appointment }: Props) {
             >
               <div className="mx-auto max-w-[640px] space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-semibold text-[#171512]">More seller feedback</h3>
+                  <h3 className={`${displayFont.className} text-2xl text-[#171512]`}>More seller feedback</h3>
                   <button
                     type="button"
                     onClick={() => setShowMoreReviews(false)}

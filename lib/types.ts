@@ -43,6 +43,8 @@ export type Appointment = {
   first_opened_at?: string;
   confirmed_at?: string;
   engagement_score?: number;
+  reminder_2hr_sent?: boolean;
+  reminder_30min_sent?: boolean;
   location_name?: string;
   location_address?: string;
   google_maps_url?: string;

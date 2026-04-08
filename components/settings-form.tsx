@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { ChangeEvent, useState } from "react";
 import { FeaturedReview } from "@/lib/types";
 
 type Props = {
@@ -55,6 +55,63 @@ export function SettingsForm({ settings }: Props) {
   });
   const [status, setStatus] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [uploadingField, setUploadingField] = useState<string | null>(null);
+
+  async function uploadFiles(files: FileList | null, folder: string) {
+    if (!files?.length) {
+      return [];
+    }
+
+    const uploads: string[] = [];
+
+    for (const file of Array.from(files)) {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("folder", folder);
+
+      const response = await fetch("/api/uploads/appointment-asset", {
+        method: "POST",
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error("Upload failed");
+      }
+
+      const payload = (await response.json()) as { url: string };
+      uploads.push(payload.url);
+    }
+
+    return uploads;
+  }
+
+  async function handleImageUpload(
+    event: ChangeEvent<HTMLInputElement>,
+    field: "advisor_photo_url" | "entrance_photo_urls" | "review_photo_urls",
+    folder: string
+  ) {
+    setUploadingField(field);
+    setStatus(null);
+
+    try {
+      const uploaded = await uploadFiles(event.target.files, folder);
+
+      setTemplate((current) => ({
+        ...current,
+        [field]:
+          field === "advisor_photo_url"
+            ? uploaded[0] || current.advisor_photo_url
+            : [current[field], ...uploaded].filter(Boolean).join("\n")
+      }));
+
+      setStatus("Image upload complete.");
+    } catch {
+      setStatus("Image upload failed.");
+    } finally {
+      event.target.value = "";
+      setUploadingField(null);
+    }
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -148,6 +205,11 @@ export function SettingsForm({ settings }: Props) {
         <TemplateField label="Advisor name" value={template.advisor_name} onChange={(value) => setTemplate({ ...template, advisor_name: value })} />
         <TemplateField label="Advisor phone" value={template.advisor_phone} onChange={(value) => setTemplate({ ...template, advisor_phone: value })} />
         <TemplateField label="Advisor photo URL" value={template.advisor_photo_url} onChange={(value) => setTemplate({ ...template, advisor_photo_url: value })} />
+        <UploadField
+          label="Upload advisor photo"
+          disabled={uploadingField === "advisor_photo_url"}
+          onChange={(event) => handleImageUpload(event, "advisor_photo_url", "advisor")}
+        />
         <TemplateField label="Location name" value={template.location_name} onChange={(value) => setTemplate({ ...template, location_name: value })} />
         <TemplateField label="Location address" value={template.location_address} onChange={(value) => setTemplate({ ...template, location_address: value })} />
         <TemplateField label="Google Maps URL" value={template.google_maps_url} onChange={(value) => setTemplate({ ...template, google_maps_url: value })} />
@@ -159,11 +221,23 @@ export function SettingsForm({ settings }: Props) {
           helper="One URL per line."
           onChange={(value) => setTemplate({ ...template, entrance_photo_urls: value })}
         />
+        <UploadField
+          label="Upload entrance photos"
+          multiple
+          disabled={uploadingField === "entrance_photo_urls"}
+          onChange={(event) => handleImageUpload(event, "entrance_photo_urls", "entrance")}
+        />
         <TemplateArea
           label="Review / trust image URLs"
           value={template.review_photo_urls}
           helper="One URL per line."
           onChange={(value) => setTemplate({ ...template, review_photo_urls: value })}
+        />
+        <UploadField
+          label="Upload review / trust images"
+          multiple
+          disabled={uploadingField === "review_photo_urls"}
+          onChange={(event) => handleImageUpload(event, "review_photo_urls", "reviews")}
         />
         <TemplateArea
           label="Featured reviews"
@@ -192,6 +266,32 @@ export function SettingsForm({ settings }: Props) {
 
       {status ? <p className="text-sm text-black/65">{status}</p> : null}
     </div>
+  );
+}
+
+function UploadField({
+  label,
+  onChange,
+  multiple = false,
+  disabled = false
+}: {
+  label: string;
+  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  multiple?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <label className="block text-sm font-medium text-ink">
+      {label}
+      <input
+        type="file"
+        accept="image/*"
+        multiple={multiple}
+        disabled={disabled}
+        onChange={onChange}
+        className="mt-2 block w-full rounded-2xl border border-black/10 bg-[#faf7f0] px-4 py-3"
+      />
+    </label>
   );
 }
 
