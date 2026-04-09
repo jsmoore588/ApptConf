@@ -326,6 +326,17 @@ export async function updateAppointment(id: string, partial: Partial<Appointment
   return data ? mapAppointment(data) : null;
 }
 
+export async function deleteAppointment(id: string) {
+  const supabase = getSupabaseServerClient();
+  const { error } = await supabase.from("appointments").delete().eq("id", id);
+
+  if (error) {
+    throw error;
+  }
+
+  return true;
+}
+
 export async function registerEvent(
   appointmentId: string,
   type: AppointmentEventType,

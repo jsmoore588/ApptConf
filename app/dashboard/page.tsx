@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { generateActionSummary } from "@/lib/openai";
 import { DashboardCreateForm } from "@/components/dashboard-create-form";
 import { listAdvisorUsers } from "@/lib/users";
+import { DashboardAppointmentActions } from "@/components/dashboard-appointment-actions";
 
 export default async function DashboardPage() {
   const currentUser = await getCurrentUser();
@@ -304,28 +305,10 @@ function AppointmentCard({
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2 md:mt-0 md:justify-end">
-        {(appointment.advisor_phone || appointment.phone) ? (
-          <>
-            <a
-              href={`sms:${appointment.advisor_phone || appointment.phone}`}
-              className="rounded-full border border-[#ddd3c8] bg-white px-4 py-2 text-sm font-semibold text-[#27231e]"
-            >
-              Text
-            </a>
-            <a
-              href={`tel:${appointment.advisor_phone || appointment.phone}`}
-              className="rounded-full border border-[#ddd3c8] bg-white px-4 py-2 text-sm font-semibold text-[#27231e]"
-            >
-              Call
-            </a>
-          </>
-        ) : null}
-        <Link
-          href={`/appt/${appointment.id}`}
-          className="rounded-full bg-[#173d33] px-4 py-2 text-sm font-semibold text-white"
-        >
-          Open page
-        </Link>
+        <DashboardAppointmentActions
+          appointmentId={appointment.id}
+          phone={appointment.advisor_phone || appointment.phone}
+        />
       </div>
     </div>
   );
