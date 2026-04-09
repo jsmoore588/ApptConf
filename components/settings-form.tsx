@@ -53,6 +53,13 @@ function reviewsToText(values?: FeaturedReview[]) {
   );
 }
 
+function textToList(value: string) {
+  return value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
 export function SettingsForm({ settings, currentUser, teamMembers }: Props) {
   const [openaiApiKey, setOpenaiApiKey] = useState("");
   const [openaiModel, setOpenaiModel] = useState(settings.openaiModel);
@@ -71,9 +78,9 @@ export function SettingsForm({ settings, currentUser, teamMembers }: Props) {
     google_reviews_url: settings.templateDefaults.google_reviews_url || "",
     yelp_reviews_url: settings.templateDefaults.yelp_reviews_url || "",
     entrance_photo_urls: listToText(settings.templateDefaults.entrance_photo_urls),
-    review_photo_urls: listToText(settings.templateDefaults.review_photo_urls),
-    featured_reviews: reviewsToText(settings.templateDefaults.featured_reviews)
-  });
+      review_photo_urls: listToText(settings.templateDefaults.review_photo_urls),
+      featured_reviews: reviewsToText(settings.templateDefaults.featured_reviews)
+    });
   const [status, setStatus] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploadingField, setUploadingField] = useState<string | null>(null);
@@ -130,8 +137,8 @@ export function SettingsForm({ settings, currentUser, teamMembers }: Props) {
       }
 
       setStatus("Image upload complete.");
-    } catch {
-      setStatus("Image upload failed.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Image upload failed.");
     } finally {
       event.target.value = "";
       setUploadingField(null);
@@ -148,14 +155,8 @@ export function SettingsForm({ settings, currentUser, teamMembers }: Props) {
       google_maps_url: template.google_maps_url.trim(),
       google_reviews_url: template.google_reviews_url.trim(),
       yelp_reviews_url: template.yelp_reviews_url.trim(),
-      entrance_photo_urls: template.entrance_photo_urls
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean),
-      review_photo_urls: template.review_photo_urls
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean),
+      entrance_photo_urls: textToList(template.entrance_photo_urls),
+      review_photo_urls: textToList(template.review_photo_urls),
       featured_reviews: template.featured_reviews
         .split("\n")
         .map((line) => line.trim())
@@ -263,6 +264,15 @@ export function SettingsForm({ settings, currentUser, teamMembers }: Props) {
               onChange={(event) => handleImageUpload(event, "advisor_photo_url", "advisor")}
             />
           </div>
+          <div className="md:col-span-2">
+            <ImagePreviewGrid
+              title="Advisor photo preview"
+              images={account.advisor_photo_url ? [account.advisor_photo_url] : []}
+              emptyLabel="No advisor photo added yet."
+              onRemove={() => setAccount((current) => ({ ...current, advisor_photo_url: "" }))}
+              single
+            />
+          </div>
         </div>
       </section>
 
@@ -286,7 +296,7 @@ export function SettingsForm({ settings, currentUser, teamMembers }: Props) {
             <TextArea
               label="Entrance photo URLs"
               value={template.entrance_photo_urls}
-              helper="One URL per line."
+              helper="One URL per line. Uploaded images will appear below immediately."
               onChange={(value) => setTemplate({ ...template, entrance_photo_urls: value })}
             />
           </div>
@@ -299,10 +309,25 @@ export function SettingsForm({ settings, currentUser, teamMembers }: Props) {
             />
           </div>
           <div className="md:col-span-2">
+            <ImagePreviewGrid
+              title="Entrance photo previews"
+              images={textToList(template.entrance_photo_urls)}
+              emptyLabel="No entrance photos added yet."
+              onRemove={(index) =>
+                setTemplate((current) => ({
+                  ...current,
+                  entrance_photo_urls: textToList(current.entrance_photo_urls)
+                    .filter((_, itemIndex) => itemIndex !== index)
+                    .join("\n")
+                }))
+              }
+            />
+          </div>
+          <div className="md:col-span-2">
             <TextArea
               label="Review / trust image URLs"
               value={template.review_photo_urls}
-              helper="One URL per line."
+              helper="One URL per line. Uploaded review photos will appear below immediately."
               onChange={(value) => setTemplate({ ...template, review_photo_urls: value })}
             />
           </div>
@@ -312,6 +337,21 @@ export function SettingsForm({ settings, currentUser, teamMembers }: Props) {
               multiple
               disabled={uploadingField === "review_photo_urls"}
               onChange={(event) => handleImageUpload(event, "review_photo_urls", "reviews")}
+            />
+          </div>
+          <div className="md:col-span-2">
+            <ImagePreviewGrid
+              title="Review photo previews"
+              images={textToList(template.review_photo_urls)}
+              emptyLabel="No review photos added yet."
+              onRemove={(index) =>
+                setTemplate((current) => ({
+                  ...current,
+                  review_photo_urls: textToList(current.review_photo_urls)
+                    .filter((_, itemIndex) => itemIndex !== index)
+                    .join("\n")
+                }))
+              }
             />
           </div>
           <div className="md:col-span-2">
@@ -343,6 +383,47 @@ export function SettingsForm({ settings, currentUser, teamMembers }: Props) {
       </div>
 
       {status ? <p className="text-sm text-[#5d5348]">{status}</p> : null}
+    </div>
+  );
+}
+
+function ImagePreviewGrid({
+  title,
+  images,
+  emptyLabel,
+  onRemove,
+  single = false
+}: {
+  title: string;
+  images: string[];
+  emptyLabel: string;
+  onRemove: (index: number) => void;
+  single?: boolean;
+}) {
+  return (
+    <div className="rounded-[1.2rem] border border-[#e5dccf] bg-[#fbf7f1] p-4">
+      <p className="text-sm font-semibold text-[#2d2923]">{title}</p>
+      {images.length === 0 ? (
+        <p className="mt-3 text-sm text-[#73685d]">{emptyLabel}</p>
+      ) : (
+        <div className={`mt-4 grid gap-3 ${single ? "max-w-[220px]" : "sm:grid-cols-2 lg:grid-cols-3"}`}>
+          {images.map((image, index) => (
+            <div key={`${image}-${index}`} className="overflow-hidden rounded-[1rem] border border-[#ddd3c7] bg-white">
+              <img src={image} alt={title} className="h-32 w-full object-cover" />
+              <div className="flex items-center justify-between gap-2 px-3 py-3">
+                <p className="truncate text-xs text-[#6d6258]">{image}</p>
+                <button
+                  type="button"
+                  onClick={() => onRemove(index)}
+                  className="shrink-0 rounded-full border border-[#d7cec1] px-3 py-1 text-xs font-semibold text-[#2d2923]"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

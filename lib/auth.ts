@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { getUserById } from "@/lib/users";
+import { getUserByEmail, getUserById } from "@/lib/users";
 
 const SESSION_COOKIE = "appointment_engine_session";
 
@@ -24,6 +24,10 @@ async function sign(value: string) {
 
 function randomSalt() {
   return crypto.randomUUID().replace(/-/g, "");
+}
+
+function isUuidLike(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 export async function hashPassword(password: string, salt = randomSalt()) {
@@ -101,6 +105,28 @@ export async function getCurrentUser() {
       created_at: new Date(0).toISOString(),
       updated_at: undefined
     };
+  }
+
+  if (!isUuidLike(userId)) {
+    const allowedEmail = (process.env.DASHBOARD_EMAIL || "admin@localhost").trim().toLowerCase();
+    const normalizedEmail = userId.trim().toLowerCase();
+
+    if (normalizedEmail === allowedEmail) {
+      return {
+        id: `legacy:${normalizedEmail}`,
+        email: normalizedEmail,
+        display_name: "Owner",
+        password_hash: "",
+        advisor_name: "Jude",
+        advisor_phone: undefined,
+        advisor_email: normalizedEmail,
+        advisor_photo_url: undefined,
+        created_at: new Date(0).toISOString(),
+        updated_at: undefined
+      };
+    }
+
+    return getUserByEmail(normalizedEmail);
   }
 
   return getUserById(userId);
