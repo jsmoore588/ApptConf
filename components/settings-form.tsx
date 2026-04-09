@@ -84,6 +84,7 @@ export function SettingsForm({ settings, currentUser, teamMembers }: Props) {
   const [status, setStatus] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploadingField, setUploadingField] = useState<string | null>(null);
+  const [uploadMessages, setUploadMessages] = useState<Record<string, string | null>>({});
 
   async function uploadFiles(files: FileList | null, folder: string) {
     if (!files?.length) {
@@ -103,7 +104,8 @@ export function SettingsForm({ settings, currentUser, teamMembers }: Props) {
       });
 
       if (!response.ok) {
-        throw new Error("Upload failed");
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(payload?.error || "Upload failed");
       }
 
       const payload = (await response.json()) as { url: string };
@@ -120,6 +122,7 @@ export function SettingsForm({ settings, currentUser, teamMembers }: Props) {
   ) {
     setUploadingField(field);
     setStatus(null);
+    setUploadMessages((current) => ({ ...current, [field]: null }));
 
     try {
       const uploaded = await uploadFiles(event.target.files, folder);
@@ -137,8 +140,14 @@ export function SettingsForm({ settings, currentUser, teamMembers }: Props) {
       }
 
       setStatus("Image upload complete.");
+      setUploadMessages((current) => ({
+        ...current,
+        [field]: uploaded.length > 0 ? `Uploaded ${uploaded.length} image${uploaded.length === 1 ? "" : "s"}.` : "Saved."
+      }));
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Image upload failed.");
+      const message = error instanceof Error ? error.message : "Image upload failed.";
+      setStatus(message);
+      setUploadMessages((current) => ({ ...current, [field]: message }));
     } finally {
       event.target.value = "";
       setUploadingField(null);
@@ -263,6 +272,7 @@ export function SettingsForm({ settings, currentUser, teamMembers }: Props) {
               disabled={uploadingField === "advisor_photo_url"}
               onChange={(event) => handleImageUpload(event, "advisor_photo_url", "advisor")}
             />
+            <UploadMessage message={uploadMessages.advisor_photo_url} />
           </div>
           <div className="md:col-span-2">
             <ImagePreviewGrid
@@ -307,6 +317,7 @@ export function SettingsForm({ settings, currentUser, teamMembers }: Props) {
               disabled={uploadingField === "entrance_photo_urls"}
               onChange={(event) => handleImageUpload(event, "entrance_photo_urls", "entrance")}
             />
+            <UploadMessage message={uploadMessages.entrance_photo_urls} />
           </div>
           <div className="md:col-span-2">
             <ImagePreviewGrid
@@ -338,6 +349,7 @@ export function SettingsForm({ settings, currentUser, teamMembers }: Props) {
               disabled={uploadingField === "review_photo_urls"}
               onChange={(event) => handleImageUpload(event, "review_photo_urls", "reviews")}
             />
+            <UploadMessage message={uploadMessages.review_photo_urls} />
           </div>
           <div className="md:col-span-2">
             <ImagePreviewGrid
@@ -385,6 +397,14 @@ export function SettingsForm({ settings, currentUser, teamMembers }: Props) {
       {status ? <p className="text-sm text-[#5d5348]">{status}</p> : null}
     </div>
   );
+}
+
+function UploadMessage({ message }: { message?: string | null }) {
+  if (!message) {
+    return null;
+  }
+
+  return <p className="mt-2 text-sm text-[#5d5348]">{message}</p>;
 }
 
 function ImagePreviewGrid({

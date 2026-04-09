@@ -3,18 +3,29 @@ import { isAuthenticated } from "@/lib/auth";
 import { uploadAppointmentAsset } from "@/lib/asset-storage";
 
 export async function POST(request: NextRequest) {
-  if (!(await isAuthenticated())) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    if (!(await isAuthenticated())) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const formData = await request.formData();
+    const file = formData.get("file");
+    const folder = String(formData.get("folder") || "misc");
+
+    if (!(file instanceof File)) {
+      return NextResponse.json({ error: "File is required" }, { status: 400 });
+    }
+
+    const url = await uploadAppointmentAsset(file, folder);
+    return NextResponse.json({ url });
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : error && typeof error === "object" && typeof Reflect.get(error, "message") === "string"
+          ? String(Reflect.get(error, "message"))
+          : "Upload failed";
+
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  const formData = await request.formData();
-  const file = formData.get("file");
-  const folder = String(formData.get("folder") || "misc");
-
-  if (!(file instanceof File)) {
-    return NextResponse.json({ error: "File is required" }, { status: 400 });
-  }
-
-  const url = await uploadAppointmentAsset(file, folder);
-  return NextResponse.json({ url });
 }
