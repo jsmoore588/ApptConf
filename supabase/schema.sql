@@ -20,6 +20,8 @@ create table if not exists appointments (
   phone text,
   email text,
   customer_phone text,
+  payoff_lender_name text,
+  payoff_photo_urls text[] not null default '{}',
   confirmed boolean not null default false,
   opened_count integer not null default 0,
   last_opened_at timestamptz,
@@ -63,6 +65,8 @@ alter table appointments add column if not exists customer_delivery_photo_urls t
 alter table appointments add column if not exists check_handoff_photo_urls text[] default '{}';
 alter table appointments add column if not exists reminder_2hr_sent boolean not null default false;
 alter table appointments add column if not exists reminder_30min_sent boolean not null default false;
+alter table appointments add column if not exists payoff_lender_name text;
+alter table appointments add column if not exists payoff_photo_urls text[] not null default '{}';
 
 do $$
 declare

@@ -84,6 +84,8 @@ function mapAppointment(row: Record<string, unknown>) {
     phone: (row.phone as string | null) ?? undefined,
     email: (row.email as string | null) ?? undefined,
     customer_phone: (row.customer_phone as string | null) ?? undefined,
+    payoff_lender_name: (row.payoff_lender_name as string | null) ?? undefined,
+    payoff_photo_urls: (row.payoff_photo_urls as string[] | null) ?? [],
     confirmed: Boolean(row.confirmed),
     opened_count: Number(row.opened_count ?? 0),
     last_opened_at: (row.last_opened_at as string | null) ?? undefined,
@@ -125,6 +127,8 @@ function toDatabaseAppointment(appointment: Appointment) {
     phone: appointment.phone ?? null,
     email: appointment.email ?? null,
     customer_phone: appointment.customer_phone ?? null,
+    payoff_lender_name: appointment.payoff_lender_name ?? null,
+    payoff_photo_urls: appointment.payoff_photo_urls ?? [],
     confirmed: appointment.confirmed ?? false,
     opened_count: appointment.opened_count ?? 0,
     last_opened_at: appointment.last_opened_at ?? null,
@@ -304,6 +308,8 @@ export async function updateAppointment(id: string, partial: Partial<Appointment
   if (partial.status !== undefined) payload.status = partial.status;
   if (partial.source !== undefined) payload.source = partial.source;
   if (partial.confirmed !== undefined) payload.confirmed = partial.confirmed;
+  if (partial.payoff_lender_name !== undefined) payload.payoff_lender_name = partial.payoff_lender_name;
+  if (partial.payoff_photo_urls !== undefined) payload.payoff_photo_urls = partial.payoff_photo_urls;
   if (partial.opened_count !== undefined) payload.opened_count = partial.opened_count;
   if (partial.last_opened_at !== undefined) payload.last_opened_at = partial.last_opened_at;
   if (partial.first_opened_at !== undefined) payload.first_opened_at = partial.first_opened_at;

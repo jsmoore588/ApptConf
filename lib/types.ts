@@ -37,6 +37,8 @@ export type Appointment = {
   phone?: string;
   email?: string;
   customer_phone?: string;
+  payoff_lender_name?: string;
+  payoff_photo_urls?: string[];
   confirmed?: boolean;
   opened_count?: number;
   last_opened_at?: string;

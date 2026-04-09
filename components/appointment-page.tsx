@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { Cormorant_Garamond, Plus_Jakarta_Sans } from "next/font/google";
 import { AnimatePresence, motion } from "framer-motion";
 import { Appointment } from "@/lib/types";
@@ -196,6 +196,9 @@ export function AppointmentPage({ appointment }: Props) {
   const [showMoreReviews, setShowMoreReviews] = useState(false);
   const [expandedExpectation, setExpandedExpectation] = useState<string | null>(null);
   const [expandedBringItem, setExpandedBringItem] = useState<string | null>(null);
+  const [bankName, setBankName] = useState(appointment.payoff_lender_name || "");
+  const [payoffPhotos, setPayoffPhotos] = useState(appointment.payoff_photo_urls ?? []);
+  const [payoffUploading, setPayoffUploading] = useState(false);
 
   const advisorName = appointment.advisor_name || appointment.advisor || "Jude";
   const timeLabel = appointment.appointment_at ? formatAppointmentDate(appointment.appointment_at) : appointment.time;
@@ -302,6 +305,51 @@ export function AppointmentPage({ appointment }: Props) {
     anchor.remove();
     URL.revokeObjectURL(url);
     setToast("Reminder file downloaded. Open it to add the appointment to your reminders or calendar.");
+  }
+
+  async function savePayoffInfo(files?: FileList | null) {
+    if (!files?.length && !bankName.trim()) {
+      setToast("Add the bank name or choose a payoff screenshot first.");
+      return;
+    }
+
+    setPayoffUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("bankName", bankName.trim());
+
+      Array.from(files || []).forEach((file) => {
+        formData.append("files", file);
+      });
+
+      const response = await fetch(`/api/appointments/${appointment.id}/payoff`, {
+        method: "POST",
+        body: formData
+      });
+
+      const payload = (await response.json()) as {
+        appointment?: { payoff_photo_urls?: string[]; payoff_lender_name?: string };
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error || "Unable to save payoff information.");
+      }
+
+      setBankName(payload.appointment?.payoff_lender_name || bankName.trim());
+      setPayoffPhotos(payload.appointment?.payoff_photo_urls || []);
+      setToast("Payoff information saved. We will have it ready before your appointment.");
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Unable to save payoff information.");
+    } finally {
+      setPayoffUploading(false);
+    }
+  }
+
+  async function handlePayoffUpload(event: ChangeEvent<HTMLInputElement>) {
+    await savePayoffInfo(event.target.files);
+    event.target.value = "";
   }
 
   return (
@@ -579,28 +627,99 @@ export function AppointmentPage({ appointment }: Props) {
           <h2 className={`${displayFont.className} mt-2 text-3xl tracking-[-0.03em] text-[#171512]`}>What to bring</h2>
           <div className="mt-5 space-y-2">
             {bringItems.map((item) => (
-              <button
+              <div
                 key={item.label}
-                type="button"
-                onClick={() =>
-                  setExpandedBringItem((current) => (current === item.label ? null : item.label))
-                }
-                className="w-full rounded-[1.2rem] border border-[#ece4d8] bg-[#fffdfa] px-4 py-3 text-left transition hover:bg-[#fcfaf7] active:scale-[0.99]"
+                className="w-full rounded-[1.2rem] border border-[#ece4d8] bg-[#fffdfa] px-4 py-3"
               >
-                <p className="text-[16px] leading-8 text-[#2e2924]">{item.label}</p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setExpandedBringItem((current) => (current === item.label ? null : item.label))
+                  }
+                  className="w-full text-left transition hover:bg-transparent active:scale-[0.99]"
+                >
+                  <p className="text-[16px] leading-8 text-[#2e2924]">{item.label}</p>
+                </button>
                 <AnimatePresence initial={false}>
                   {expandedBringItem === item.label ? (
-                    <motion.p
+                    <motion.div
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="overflow-hidden text-sm leading-6 text-[#60574e]"
+                      className="overflow-hidden"
                     >
-                      {item.detail}
-                    </motion.p>
+                      <p className="text-sm leading-6 text-[#60574e]">{item.detail}</p>
+                      {item.label === "Payoff info (if applicable)" ? (
+                        <div className="mt-4 rounded-[1.1rem] border border-[#e9dece] bg-[#f8f3ec] p-4">
+                          <p className="text-sm font-semibold text-[#201b16]">10-day payoff</p>
+                          <p className="mt-2 text-sm leading-6 text-[#655b50]">
+                            If you still owe money on the vehicle, add your bank name and a screenshot or photo of the 10-day payoff amount.
+                          </p>
+
+                          <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto]">
+                            <label className="block text-sm font-medium text-[#2d2923]">
+                              Bank or lender name
+                              <input
+                                type="text"
+                                value={bankName}
+                                onChange={(event) => setBankName(event.target.value)}
+                                placeholder="Ally, Capital One, Navy Federal..."
+                                className="mt-2 w-full rounded-[1rem] border border-[#d8cdbc] bg-white px-4 py-3 text-[#1f1a16]"
+                              />
+                            </label>
+                            <label className="block text-sm font-medium text-[#2d2923]">
+                              Upload payoff photo
+                              <input
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                disabled={payoffUploading}
+                                onChange={handlePayoffUpload}
+                                className="mt-2 block w-full rounded-[1rem] border border-[#d8cdbc] bg-white px-4 py-3 text-[#1f1a16]"
+                              />
+                            </label>
+                          </div>
+
+                          <div className="mt-4 flex flex-wrap gap-3">
+                            <button
+                              type="button"
+                              disabled={payoffUploading}
+                              onClick={() => savePayoffInfo(null)}
+                              className="rounded-full border border-[#d9cdbd] bg-white px-4 py-2 text-sm font-semibold text-[#201b16] disabled:opacity-70"
+                            >
+                              {payoffUploading ? "Saving..." : "Save bank name"}
+                            </button>
+                            {bankName ? (
+                              <div className="rounded-full bg-[#ece3d5] px-4 py-2 text-sm text-[#62574b]">
+                                Lender: {bankName}
+                              </div>
+                            ) : null}
+                          </div>
+
+                          {payoffPhotos.length > 0 ? (
+                            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                              {payoffPhotos.map((image, index) => (
+                                <div
+                                  key={`${image}-${index}`}
+                                  className="overflow-hidden rounded-[1rem] border border-[#ded3c6] bg-white"
+                                >
+                                  <SafeImage
+                                    src={image}
+                                    alt="Payoff document"
+                                    className="h-40 w-full object-cover"
+                                    fallbackClassName="flex h-40 w-full items-center justify-center bg-[#efe6d9] text-sm text-[#6c6258]"
+                                    fallbackLabel="Payoff image unavailable"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </motion.div>
                   ) : null}
                 </AnimatePresence>
-              </button>
+              </div>
             ))}
           </div>
         </section>
