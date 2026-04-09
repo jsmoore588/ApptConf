@@ -201,6 +201,7 @@ export function AppointmentPage({ appointment }: Props) {
   const [payoffUploading, setPayoffUploading] = useState(false);
 
   const advisorName = appointment.advisor_name || appointment.advisor || "Jude";
+  const advisorFirstName = advisorName.trim().split(/\s+/)[0] || advisorName;
   const timeLabel = appointment.appointment_at ? formatAppointmentDate(appointment.appointment_at) : appointment.time;
   const shortTime = formatShortTime(appointment.appointment_at) || appointment.time || timeLabel;
   const dayTime = formatDayTime(appointment.appointment_at);
@@ -366,7 +367,7 @@ export function AppointmentPage({ appointment }: Props) {
 
               <div className="space-y-3">
                 <h1 className={`${displayFont.className} max-w-3xl text-4xl leading-[0.94] tracking-[-0.05em] text-[#171512] sm:text-5xl md:text-6xl`}>
-                  {appointment.name}, {advisorName} will be ready for you at {shortTime}.
+                  {appointment.name}, {advisorFirstName} will be ready for you at {shortTime}.
                 </h1>
                 <p className="max-w-2xl text-[17px] leading-8 text-[#4f463d]">
                   {appointment.name}, your appointment to sell the {appointment.vehicle} is already set aside.
@@ -532,7 +533,7 @@ export function AppointmentPage({ appointment }: Props) {
                 </div>
                 <div>
                   <p className="text-[15px] font-semibold leading-7 text-[#2e2924]">
-                    {index === 2 ? `Come inside and ask for ${advisorName}` : step}
+                    {index === 2 ? `Come inside and ask for ${advisorFirstName}` : step}
                   </p>
                   <p className="text-sm leading-6 text-[#6a6158]">
                     {index === 0
