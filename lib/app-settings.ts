@@ -16,11 +16,36 @@ export type TemplateSettings = {
   review_photo_urls?: string[];
 };
 
+export type AdvisorProfileKey = "jude" | "crystal";
+
+export type AdvisorProfile = {
+  key: AdvisorProfileKey;
+  label: string;
+  advisor_name?: string;
+  advisor_phone?: string;
+  advisor_photo_url?: string;
+  advisor_email?: string;
+};
+
 export type AppSettings = {
   openaiApiKey?: string;
   openaiModel?: string;
   templateDefaults?: TemplateSettings;
+  advisorProfiles?: AdvisorProfile[];
 };
+
+const DEFAULT_ADVISOR_PROFILES: AdvisorProfile[] = [
+  {
+    key: "jude",
+    label: "Jude",
+    advisor_name: "Jude"
+  },
+  {
+    key: "crystal",
+    label: "Crystal",
+    advisor_name: "Crystal"
+  }
+];
 
 async function readSetting<T>(key: string, fallback: T) {
   const supabase = getSupabaseServerClient();
@@ -43,18 +68,20 @@ async function writeSetting<T>(key: string, value: T) {
 }
 
 export async function getAppSettings() {
-  const [openaiSettings, templateDefaults] = await Promise.all([
+  const [openaiSettings, templateDefaults, advisorProfiles] = await Promise.all([
     readSetting<Omit<AppSettings, "templateDefaults">>("openai", {}),
     readSetting<TemplateSettings>("template_defaults", {
       advisor_name: "Jude",
       location_name: DEFAULT_LOCATION_NAME,
       location_address: DEFAULT_LOCATION_ADDRESS
-    })
+    }),
+    readSetting<AdvisorProfile[]>("advisor_profiles", DEFAULT_ADVISOR_PROFILES)
   ]);
 
   return {
     ...openaiSettings,
-    templateDefaults
+    templateDefaults,
+    advisorProfiles
   } satisfies AppSettings;
 }
 
@@ -74,7 +101,8 @@ export async function updateAppSettings(next: AppSettings) {
       openaiApiKey: merged.openaiApiKey,
       openaiModel: merged.openaiModel
     }),
-    writeSetting("template_defaults", merged.templateDefaults || {})
+    writeSetting("template_defaults", merged.templateDefaults || {}),
+    writeSetting("advisor_profiles", merged.advisorProfiles || DEFAULT_ADVISOR_PROFILES)
   ]);
 
   return merged;
@@ -85,6 +113,7 @@ export async function getPublicAppSettings() {
   return {
     openaiConfigured: Boolean(settings.openaiApiKey),
     openaiModel: settings.openaiModel || "gpt-4.1-mini",
+    advisorProfiles: settings.advisorProfiles || DEFAULT_ADVISOR_PROFILES,
     templateDefaults: settings.templateDefaults || {
       advisor_name: "Jude",
       location_name: DEFAULT_LOCATION_NAME,

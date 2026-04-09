@@ -8,6 +8,14 @@ type Props = {
   settings: {
     openaiConfigured: boolean;
     openaiModel: string;
+    advisorProfiles: Array<{
+      key: "jude" | "crystal";
+      label: string;
+      advisor_name?: string;
+      advisor_phone?: string;
+      advisor_photo_url?: string;
+      advisor_email?: string;
+    }>;
     templateDefaults: {
       advisor_name?: string;
       advisor_phone?: string;
@@ -39,6 +47,14 @@ function reviewsToText(values?: FeaturedReview[]) {
 export function SettingsForm({ settings }: Props) {
   const [openaiApiKey, setOpenaiApiKey] = useState("");
   const [openaiModel, setOpenaiModel] = useState(settings.openaiModel);
+  const [advisorProfiles, setAdvisorProfiles] = useState(
+    settings.advisorProfiles.length > 0
+      ? settings.advisorProfiles
+      : [
+          { key: "jude" as const, label: "Jude", advisor_name: "Jude" },
+          { key: "crystal" as const, label: "Crystal", advisor_name: "Crystal" }
+        ]
+  );
   const [template, setTemplate] = useState({
     advisor_name: settings.templateDefaults.advisor_name || "Jude",
     advisor_phone: settings.templateDefaults.advisor_phone || "",
@@ -149,7 +165,7 @@ export function SettingsForm({ settings }: Props) {
       const response = await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ openaiApiKey, openaiModel, templateDefaults })
+        body: JSON.stringify({ openaiApiKey, openaiModel, advisorProfiles, templateDefaults })
       });
 
       if (!response.ok) {
@@ -245,6 +261,65 @@ export function SettingsForm({ settings }: Props) {
           helper="One per line in this format: Name | Review text | Source"
           onChange={(value) => setTemplate({ ...template, featured_reviews: value })}
         />
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold text-ink">Appraiser Profiles</h2>
+        <p className="text-sm leading-7 text-black/60">
+          These presets power the dashboard link generator so you can switch between Jude and Crystal instantly.
+        </p>
+
+        {advisorProfiles.map((profile, index) => (
+          <div key={profile.key} className="rounded-[1.5rem] border border-black/10 bg-[#faf7f0] p-4">
+            <p className="text-sm font-semibold text-ink">{profile.label}</p>
+            <div className="mt-4 grid gap-4">
+              <TemplateField
+                label="Display name"
+                value={profile.advisor_name || ""}
+                onChange={(value) =>
+                  setAdvisorProfiles((current) =>
+                    current.map((item, itemIndex) =>
+                      itemIndex === index ? { ...item, advisor_name: value } : item
+                    )
+                  )
+                }
+              />
+              <TemplateField
+                label="Phone"
+                value={profile.advisor_phone || ""}
+                onChange={(value) =>
+                  setAdvisorProfiles((current) =>
+                    current.map((item, itemIndex) =>
+                      itemIndex === index ? { ...item, advisor_phone: value } : item
+                    )
+                  )
+                }
+              />
+              <TemplateField
+                label="Email"
+                value={profile.advisor_email || ""}
+                onChange={(value) =>
+                  setAdvisorProfiles((current) =>
+                    current.map((item, itemIndex) =>
+                      itemIndex === index ? { ...item, advisor_email: value } : item
+                    )
+                  )
+                }
+              />
+              <TemplateField
+                label="Photo URL"
+                value={profile.advisor_photo_url || ""}
+                onChange={(value) =>
+                  setAdvisorProfiles((current) =>
+                    current.map((item, itemIndex) =>
+                      itemIndex === index ? { ...item, advisor_photo_url: value } : item
+                    )
+                  )
+                }
+              />
+            </div>
+          </div>
+        ))}
       </section>
 
       <div className="flex flex-wrap gap-3">

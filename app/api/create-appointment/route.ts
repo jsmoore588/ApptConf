@@ -14,9 +14,11 @@ type CreatePayload = {
   time?: string;
   appointment_at?: string;
   advisor?: string;
+  advisor_key?: "jude" | "crystal";
   advisor_name?: string;
   advisor_phone?: string;
   advisor_photo_url?: string;
+  advisor_email?: string;
   customer_phone?: string;
   phone?: string;
   email?: string;
@@ -56,9 +58,14 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as CreatePayload;
     const appSettings = await getAppSettings();
     const template = appSettings.templateDefaults || {};
+    const selectedAdvisor = appSettings.advisorProfiles?.find((profile) => profile.key === body.advisor_key);
 
     const customerName = body.customer_name?.trim() || body.name?.trim();
-    const advisorName = body.advisor_name?.trim() || body.advisor?.trim() || template.advisor_name?.trim();
+    const advisorName =
+      body.advisor_name?.trim() ||
+      body.advisor?.trim() ||
+      selectedAdvisor?.advisor_name?.trim() ||
+      template.advisor_name?.trim();
     const appointmentAt = body.appointment_at || (body.time ? parseAppointmentTime(body.time) : null);
 
     if (!customerName || !body.vehicle?.trim() || !advisorName || !appointmentAt) {
@@ -83,8 +90,12 @@ export async function POST(request: NextRequest) {
       time: formatAppointmentDate(appointmentAt),
       advisor_name: advisorName,
       advisor: advisorName,
-      advisor_phone: body.advisor_phone?.trim() || template.advisor_phone,
-      advisor_photo_url: body.advisor_photo_url?.trim() || template.advisor_photo_url,
+      advisor_phone:
+        body.advisor_phone?.trim() || selectedAdvisor?.advisor_phone?.trim() || template.advisor_phone,
+      advisor_photo_url:
+        body.advisor_photo_url?.trim() ||
+        selectedAdvisor?.advisor_photo_url?.trim() ||
+        template.advisor_photo_url,
       appointment_page_url: pageUrl,
       google_calendar_event_id: undefined,
       calendar_sync_status: "pending",
@@ -94,7 +105,7 @@ export async function POST(request: NextRequest) {
       mileage: body.mileage?.trim(),
       notes: body.notes?.trim(),
       phone: body.phone?.trim(),
-      email: body.email?.trim(),
+      email: body.email?.trim() || body.advisor_email?.trim() || selectedAdvisor?.advisor_email?.trim(),
       customer_phone: body.customer_phone?.trim(),
       confirmed: false,
       opened_count: 0,

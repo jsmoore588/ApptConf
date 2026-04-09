@@ -18,6 +18,14 @@ export async function POST(request: NextRequest) {
   const body = (await request.json()) as {
     openaiApiKey?: string;
     openaiModel?: string;
+    advisorProfiles?: Array<{
+      key: "jude" | "crystal";
+      label: string;
+      advisor_name?: string;
+      advisor_phone?: string;
+      advisor_photo_url?: string;
+      advisor_email?: string;
+    }>;
     templateDefaults?: {
       advisor_name?: string;
       advisor_phone?: string;
@@ -40,9 +48,11 @@ export async function POST(request: NextRequest) {
   const nextSettings: {
     openaiApiKey?: string;
     openaiModel?: string;
+    advisorProfiles?: typeof body.advisorProfiles;
     templateDefaults?: typeof body.templateDefaults;
   } = {
     openaiModel: body.openaiModel?.trim() || "gpt-4.1-mini",
+    advisorProfiles: body.advisorProfiles,
     templateDefaults: body.templateDefaults
   };
 

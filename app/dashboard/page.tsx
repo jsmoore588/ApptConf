@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { getDashboardMetrics } from "@/lib/storage";
 import { isAuthenticated } from "@/lib/auth";
 import { generateActionSummary } from "@/lib/openai";
+import { getPublicAppSettings } from "@/lib/app-settings";
+import { DashboardCreateForm } from "@/components/dashboard-create-form";
 
 export default async function DashboardPage() {
   const authenticated = await isAuthenticated();
@@ -12,6 +14,7 @@ export default async function DashboardPage() {
   }
 
   const dashboard = await getDashboardMetrics();
+  const settings = await getPublicAppSettings();
   let aiSummary: string | null = null;
 
   try {
@@ -64,6 +67,8 @@ export default async function DashboardPage() {
           <MetricCard label="High-intent" value={dashboard.highIntent.toString()} />
         </div>
       </section>
+
+      <DashboardCreateForm advisorProfiles={settings.advisorProfiles} />
 
       <section className="mt-6 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
         <div className="rounded-[2rem] border border-black/5 bg-[#1d2a26] p-6 text-white shadow-card">
