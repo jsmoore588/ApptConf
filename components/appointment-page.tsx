@@ -49,7 +49,7 @@ function createGoogleCalendarLink(appointment: Appointment, startLabel: string) 
   end.setHours(end.getHours() + 1);
 
   const dateText = `${toGoogleDate(start)}/${toGoogleDate(end)}`;
-  const text = encodeURIComponent(`Appointment - ${appointment.name}`);
+  const text = encodeURIComponent(`Appointment to Sell ${appointment.vehicle}`);
   const details = encodeURIComponent(
     `Vehicle: ${appointment.vehicle}\nTime: ${startLabel}\nAdvisor: ${appointment.advisor_name || appointment.advisor}`
   );
@@ -78,18 +78,18 @@ function createReminderFile(appointment: Appointment, startLabel: string) {
     `DTSTAMP:${toGoogleDate(new Date())}`,
     `DTSTART:${toGoogleDate(start)}`,
     `DTEND:${toGoogleDate(end)}`,
-    `SUMMARY:Appointment for ${escapeIcsText(appointment.name)}`,
+    `SUMMARY:Appointment to Sell ${escapeIcsText(appointment.vehicle)}`,
     `DESCRIPTION:${escapeIcsText(`Vehicle: ${appointment.vehicle}\\nTime: ${startLabel}\\nAdvisor: ${appointment.advisor_name || appointment.advisor || "Advisor"}`)}`,
     `LOCATION:${escapeIcsText(appointment.location_address || appointment.location_name || `${DEFAULT_LOCATION_NAME}, ${DEFAULT_LOCATION_ADDRESS}`)}`,
     "BEGIN:VALARM",
     "TRIGGER:-PT2H",
     "ACTION:DISPLAY",
-    "DESCRIPTION:Appointment reminder",
+    `DESCRIPTION:${escapeIcsText(`Reminder for ${appointment.name}'s sell appointment`)}`,
     "END:VALARM",
     "BEGIN:VALARM",
     "TRIGGER:-PT30M",
     "ACTION:DISPLAY",
-    "DESCRIPTION:Appointment reminder",
+    `DESCRIPTION:${escapeIcsText(`Reminder for ${appointment.name}'s sell appointment`)}`,
     "END:VALARM",
     "END:VEVENT",
     "END:VCALENDAR"
@@ -318,11 +318,11 @@ export function AppointmentPage({ appointment }: Props) {
 
               <div className="space-y-3">
                 <h1 className={`${displayFont.className} max-w-3xl text-4xl leading-[0.94] tracking-[-0.05em] text-[#171512] sm:text-5xl md:text-6xl`}>
-                  {advisorName} will be ready for you at {shortTime}.
+                  {appointment.name}, {advisorName} will be ready for you at {shortTime}.
                 </h1>
                 <p className="max-w-2xl text-[17px] leading-8 text-[#4f463d]">
-                  Your appointment for the {appointment.vehicle} is already set aside. We&apos;ll keep the visit
-                  clear, quick, and professional from the moment you arrive.
+                  {appointment.name}, your appointment to sell the {appointment.vehicle} is already set aside.
+                  We&apos;ll keep the visit clear, quick, and professional from the moment you arrive.
                 </p>
               </div>
 
@@ -384,7 +384,7 @@ export function AppointmentPage({ appointment }: Props) {
 
               <div className="flex flex-wrap gap-2 text-[11px] font-medium uppercase tracking-[0.16em] text-[#756858]">
                 <span className="rounded-full border border-white/40 bg-white/45 px-3 py-2 backdrop-blur">
-                  Time already reserved
+                  {appointment.name}&apos;s time already reserved
                 </span>
                 <span className="rounded-full border border-white/40 bg-white/45 px-3 py-2 backdrop-blur">
                   Arrival steps below
@@ -418,7 +418,7 @@ export function AppointmentPage({ appointment }: Props) {
                 <div>
                   <p className="text-2xl font-semibold">{advisorName}</p>
                   <p className="mt-1 text-sm leading-7 text-white/72">
-                    I&apos;ll already have your visit lined up when you get here.
+                    I&apos;ll already have {appointment.name}&apos;s visit lined up when you get here.
                   </p>
                 </div>
               </div>
@@ -462,7 +462,7 @@ export function AppointmentPage({ appointment }: Props) {
 
         <section className="rounded-[1.75rem] border border-[#e3d7c8] bg-white/78 p-6 shadow-[0_18px_42px_rgba(45,35,24,0.07)]">
           <p className="text-[17px] leading-8 text-[#2e2924]">
-            You&apos;re coming in for your {appointment.vehicle}.
+            {appointment.name}, you&apos;re coming in for your {appointment.vehicle}.
           </p>
           {dayTime ? <p className="text-[15px] text-[#6a6158]">{dayTime}</p> : null}
         </section>
@@ -471,7 +471,7 @@ export function AppointmentPage({ appointment }: Props) {
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8a6f50]">Arrival</p>
           <h2 className={`${displayFont.className} mt-2 text-3xl tracking-[-0.03em] text-[#171512]`}>When you arrive</h2>
           <p className="mt-3 text-sm leading-7 text-[#61564b]">
-            Everything below is meant to remove uncertainty before you get here.
+            Everything below is meant to remove uncertainty before you get here, {appointment.name}.
           </p>
           <div className="space-y-3">
             {arrivalSteps.map((step, index) => (
@@ -542,6 +542,9 @@ export function AppointmentPage({ appointment }: Props) {
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8a6f50]">Visit</p>
           <h2 className={`${displayFont.className} mt-2 text-3xl tracking-[-0.03em] text-[#171512]`}>What to expect</h2>
           <p className="mt-3 text-[16px] leading-8 text-[#4d463f]">This usually takes about 30 to 45 minutes.</p>
+          <p className="mt-2 text-sm leading-7 text-[#6b6258]">
+            {appointment.name}, the goal is to keep your visit straightforward and worth the drive.
+          </p>
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
             {expectationSteps.map((step) => (
               <button
@@ -745,7 +748,7 @@ export function AppointmentPage({ appointment }: Props) {
             We have time set aside specifically for you.
           </h2>
           <p className="mx-auto mt-3 max-w-2xl text-[17px] leading-8 text-white/74">
-            Confirming now helps us keep the appointment moving the moment you arrive.
+            Confirming now helps us keep {appointment.name}&apos;s appointment moving the moment you arrive.
           </p>
           <button
             type="button"

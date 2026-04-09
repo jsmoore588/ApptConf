@@ -8,14 +8,6 @@ type Props = {
   settings: {
     openaiConfigured: boolean;
     openaiModel: string;
-    advisorProfiles: Array<{
-      key: "jude" | "crystal";
-      label: string;
-      advisor_name?: string;
-      advisor_phone?: string;
-      advisor_photo_url?: string;
-      advisor_email?: string;
-    }>;
     templateDefaults: {
       advisor_name?: string;
       advisor_phone?: string;
@@ -30,6 +22,23 @@ type Props = {
       featured_reviews?: FeaturedReview[];
     };
   };
+  currentUser: {
+    id: string;
+    email: string;
+    display_name: string;
+    advisor_name?: string;
+    advisor_phone?: string;
+    advisor_email?: string;
+    advisor_photo_url?: string;
+  };
+  teamMembers: Array<{
+    id: string;
+    email: string;
+    display_name: string;
+    advisor_name?: string;
+    advisor_phone?: string;
+    advisor_email?: string;
+  }>;
 };
 
 function listToText(values?: string[]) {
@@ -44,21 +53,17 @@ function reviewsToText(values?: FeaturedReview[]) {
   );
 }
 
-export function SettingsForm({ settings }: Props) {
+export function SettingsForm({ settings, currentUser, teamMembers }: Props) {
   const [openaiApiKey, setOpenaiApiKey] = useState("");
   const [openaiModel, setOpenaiModel] = useState(settings.openaiModel);
-  const [advisorProfiles, setAdvisorProfiles] = useState(
-    settings.advisorProfiles.length > 0
-      ? settings.advisorProfiles
-      : [
-          { key: "jude" as const, label: "Jude", advisor_name: "Jude" },
-          { key: "crystal" as const, label: "Crystal", advisor_name: "Crystal" }
-        ]
-  );
+  const [account, setAccount] = useState({
+    display_name: currentUser.display_name || "",
+    advisor_name: currentUser.advisor_name || currentUser.display_name || "",
+    advisor_phone: currentUser.advisor_phone || "",
+    advisor_email: currentUser.advisor_email || currentUser.email || "",
+    advisor_photo_url: currentUser.advisor_photo_url || ""
+  });
   const [template, setTemplate] = useState({
-    advisor_name: settings.templateDefaults.advisor_name || "Jude",
-    advisor_phone: settings.templateDefaults.advisor_phone || "",
-    advisor_photo_url: settings.templateDefaults.advisor_photo_url || "",
     location_name: settings.templateDefaults.location_name || "Bullard Buying Center",
     location_address:
       settings.templateDefaults.location_address || "1147 E. I65 Service Rd., Mobile, AL 36606",
@@ -112,13 +117,17 @@ export function SettingsForm({ settings }: Props) {
     try {
       const uploaded = await uploadFiles(event.target.files, folder);
 
-      setTemplate((current) => ({
-        ...current,
-        [field]:
-          field === "advisor_photo_url"
-            ? uploaded[0] || current.advisor_photo_url
-            : [current[field], ...uploaded].filter(Boolean).join("\n")
-      }));
+      if (field === "advisor_photo_url") {
+        setAccount((current) => ({
+          ...current,
+          advisor_photo_url: uploaded[0] || current.advisor_photo_url
+        }));
+      } else {
+        setTemplate((current) => ({
+          ...current,
+          [field]: [current[field], ...uploaded].filter(Boolean).join("\n")
+        }));
+      }
 
       setStatus("Image upload complete.");
     } catch {
@@ -134,9 +143,6 @@ export function SettingsForm({ settings }: Props) {
     setStatus(null);
 
     const templateDefaults = {
-      advisor_name: template.advisor_name.trim(),
-      advisor_phone: template.advisor_phone.trim(),
-      advisor_photo_url: template.advisor_photo_url.trim(),
       location_name: template.location_name.trim(),
       location_address: template.location_address.trim(),
       google_maps_url: template.google_maps_url.trim(),
@@ -165,7 +171,12 @@ export function SettingsForm({ settings }: Props) {
       const response = await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ openaiApiKey, openaiModel, advisorProfiles, templateDefaults })
+        body: JSON.stringify({
+          openaiApiKey,
+          openaiModel,
+          accountProfile: account,
+          templateDefaults
+        })
       });
 
       if (!response.ok) {
@@ -182,144 +193,136 @@ export function SettingsForm({ settings }: Props) {
   }
 
   return (
-    <div className="mt-6 space-y-8">
-      <div className="rounded-[1.5rem] bg-[#faf7f0] p-4 text-sm text-black/65">
-        OpenAI key status: {settings.openaiConfigured ? "configured" : "not configured"}
-      </div>
+    <div className="mt-8 space-y-8">
+      <section className="grid gap-6 lg:grid-cols-[1fr_0.9fr]">
+        <div className="rounded-[1.7rem] bg-[#173d33] p-6 text-white">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/50">Your account</p>
+          <h2 className="mt-3 text-3xl font-semibold">Your defaults follow your login.</h2>
+          <p className="mt-3 text-sm leading-7 text-white/74">
+            When you create a link from the dashboard, these values become the advisor name, phone,
+            email, and photo automatically.
+          </p>
 
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold text-ink">OpenAI</h2>
-        <label className="block text-sm font-medium text-ink">
-          OpenAI API key
-          <input
-            type="password"
-            value={openaiApiKey}
-            onChange={(event) => setOpenaiApiKey(event.target.value)}
-            placeholder={settings.openaiConfigured ? "Saved. Enter a new key to replace it." : "sk-..."}
-            className="mt-2 w-full rounded-2xl border border-black/10 bg-[#faf7f0] px-4 py-3"
-          />
-        </label>
-
-        <label className="block text-sm font-medium text-ink">
-          Model
-          <input
-            type="text"
-            value={openaiModel}
-            onChange={(event) => setOpenaiModel(event.target.value)}
-            className="mt-2 w-full rounded-2xl border border-black/10 bg-[#faf7f0] px-4 py-3"
-          />
-        </label>
-      </section>
-
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold text-ink">Customer Page Template</h2>
-        <p className="text-sm leading-7 text-black/60">
-          These values fill in the advisor, arrival, maps, photo, and review sections for future appointments
-          when those fields are not passed individually.
-        </p>
-
-        <TemplateField label="Advisor name" value={template.advisor_name} onChange={(value) => setTemplate({ ...template, advisor_name: value })} />
-        <TemplateField label="Advisor phone" value={template.advisor_phone} onChange={(value) => setTemplate({ ...template, advisor_phone: value })} />
-        <TemplateField label="Advisor photo URL" value={template.advisor_photo_url} onChange={(value) => setTemplate({ ...template, advisor_photo_url: value })} />
-        <UploadField
-          label="Upload advisor photo"
-          disabled={uploadingField === "advisor_photo_url"}
-          onChange={(event) => handleImageUpload(event, "advisor_photo_url", "advisor")}
-        />
-        <TemplateField label="Location name" value={template.location_name} onChange={(value) => setTemplate({ ...template, location_name: value })} />
-        <TemplateField label="Location address" value={template.location_address} onChange={(value) => setTemplate({ ...template, location_address: value })} />
-        <TemplateField label="Google Maps URL" value={template.google_maps_url} onChange={(value) => setTemplate({ ...template, google_maps_url: value })} />
-        <TemplateField label="Google reviews URL" value={template.google_reviews_url} onChange={(value) => setTemplate({ ...template, google_reviews_url: value })} />
-        <TemplateField label="Yelp reviews URL" value={template.yelp_reviews_url} onChange={(value) => setTemplate({ ...template, yelp_reviews_url: value })} />
-        <TemplateArea
-          label="Entrance photo URLs"
-          value={template.entrance_photo_urls}
-          helper="One URL per line."
-          onChange={(value) => setTemplate({ ...template, entrance_photo_urls: value })}
-        />
-        <UploadField
-          label="Upload entrance photos"
-          multiple
-          disabled={uploadingField === "entrance_photo_urls"}
-          onChange={(event) => handleImageUpload(event, "entrance_photo_urls", "entrance")}
-        />
-        <TemplateArea
-          label="Review / trust image URLs"
-          value={template.review_photo_urls}
-          helper="One URL per line."
-          onChange={(value) => setTemplate({ ...template, review_photo_urls: value })}
-        />
-        <UploadField
-          label="Upload review / trust images"
-          multiple
-          disabled={uploadingField === "review_photo_urls"}
-          onChange={(event) => handleImageUpload(event, "review_photo_urls", "reviews")}
-        />
-        <TemplateArea
-          label="Featured reviews"
-          value={template.featured_reviews}
-          helper="One per line in this format: Name | Review text | Source"
-          onChange={(value) => setTemplate({ ...template, featured_reviews: value })}
-        />
-      </section>
-
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold text-ink">Appraiser Profiles</h2>
-        <p className="text-sm leading-7 text-black/60">
-          These presets power the dashboard link generator so you can switch between Jude and Crystal instantly.
-        </p>
-
-        {advisorProfiles.map((profile, index) => (
-          <div key={profile.key} className="rounded-[1.5rem] border border-black/10 bg-[#faf7f0] p-4">
-            <p className="text-sm font-semibold text-ink">{profile.label}</p>
-            <div className="mt-4 grid gap-4">
-              <TemplateField
-                label="Display name"
-                value={profile.advisor_name || ""}
-                onChange={(value) =>
-                  setAdvisorProfiles((current) =>
-                    current.map((item, itemIndex) =>
-                      itemIndex === index ? { ...item, advisor_name: value } : item
-                    )
-                  )
-                }
-              />
-              <TemplateField
-                label="Phone"
-                value={profile.advisor_phone || ""}
-                onChange={(value) =>
-                  setAdvisorProfiles((current) =>
-                    current.map((item, itemIndex) =>
-                      itemIndex === index ? { ...item, advisor_phone: value } : item
-                    )
-                  )
-                }
-              />
-              <TemplateField
-                label="Email"
-                value={profile.advisor_email || ""}
-                onChange={(value) =>
-                  setAdvisorProfiles((current) =>
-                    current.map((item, itemIndex) =>
-                      itemIndex === index ? { ...item, advisor_email: value } : item
-                    )
-                  )
-                }
-              />
-              <TemplateField
-                label="Photo URL"
-                value={profile.advisor_photo_url || ""}
-                onChange={(value) =>
-                  setAdvisorProfiles((current) =>
-                    current.map((item, itemIndex) =>
-                      itemIndex === index ? { ...item, advisor_photo_url: value } : item
-                    )
-                  )
-                }
-              />
+          <div className="mt-6 rounded-[1.4rem] border border-white/10 bg-white/6 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/45">Team access</p>
+            <div className="mt-4 space-y-3">
+              {teamMembers.map((member) => (
+                <div
+                  key={member.id}
+                  className="flex items-center justify-between gap-3 rounded-[1rem] border border-white/8 bg-white/5 px-4 py-3"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-white">
+                      {member.advisor_name || member.display_name}
+                    </p>
+                    <p className="text-xs text-white/60">{member.email}</p>
+                  </div>
+                  <span className="rounded-full border border-white/10 px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-white/65">
+                    {member.id === currentUser.id ? "You" : "Team"}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
-        ))}
+        </div>
+
+        <div className="rounded-[1.7rem] border border-[#ddd3c7] bg-[#fcfaf6] p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8a6f50]">AI</p>
+          <h2 className="mt-3 text-2xl font-semibold text-[#181510]">OpenAI configuration</h2>
+          <div className="mt-5 space-y-4">
+            <div className="rounded-[1.15rem] bg-[#f3ece3] px-4 py-3 text-sm text-[#5e5448]">
+              OpenAI key status: {settings.openaiConfigured ? "configured" : "not configured"}
+            </div>
+            <TextField
+              label="OpenAI API key"
+              type="password"
+              value={openaiApiKey}
+              placeholder={settings.openaiConfigured ? "Saved. Enter a new key to replace it." : "sk-..."}
+              onChange={setOpenaiApiKey}
+            />
+            <TextField label="Model" value={openaiModel} onChange={setOpenaiModel} />
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-[1.8rem] border border-[#ddd3c7] bg-white/78 p-6 shadow-[0_18px_42px_rgba(45,35,24,0.07)]">
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8a6f50]">Profile</p>
+        <h2 className="mt-3 text-2xl font-semibold text-[#181510]">Your advisor identity</h2>
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <TextField label="Display name" value={account.display_name} onChange={(value) => setAccount({ ...account, display_name: value })} />
+          <TextField label="Advisor name shown to customers" value={account.advisor_name} onChange={(value) => setAccount({ ...account, advisor_name: value })} />
+          <TextField label="Advisor phone" value={account.advisor_phone} onChange={(value) => setAccount({ ...account, advisor_phone: value })} />
+          <TextField label="Advisor email" value={account.advisor_email} onChange={(value) => setAccount({ ...account, advisor_email: value })} />
+          <div className="md:col-span-2">
+            <TextField label="Advisor photo URL" value={account.advisor_photo_url} onChange={(value) => setAccount({ ...account, advisor_photo_url: value })} />
+          </div>
+          <div className="md:col-span-2">
+            <UploadField
+              label="Upload advisor photo"
+              disabled={uploadingField === "advisor_photo_url"}
+              onChange={(event) => handleImageUpload(event, "advisor_photo_url", "advisor")}
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-[1.8rem] border border-[#ddd3c7] bg-white/78 p-6 shadow-[0_18px_42px_rgba(45,35,24,0.07)]">
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8a6f50]">Customer page</p>
+        <h2 className="mt-3 text-2xl font-semibold text-[#181510]">Shared template defaults</h2>
+        <p className="mt-2 text-sm leading-7 text-[#62584d]">
+          These values stay shared across the whole team so every customer page uses the same location,
+          maps, review links, entrance photos, and trust content.
+        </p>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <TextField label="Location name" value={template.location_name} onChange={(value) => setTemplate({ ...template, location_name: value })} />
+          <TextField label="Location address" value={template.location_address} onChange={(value) => setTemplate({ ...template, location_address: value })} />
+          <TextField label="Google Maps URL" value={template.google_maps_url} onChange={(value) => setTemplate({ ...template, google_maps_url: value })} />
+          <TextField label="Google reviews URL" value={template.google_reviews_url} onChange={(value) => setTemplate({ ...template, google_reviews_url: value })} />
+          <div className="md:col-span-2">
+            <TextField label="Yelp reviews URL" value={template.yelp_reviews_url} onChange={(value) => setTemplate({ ...template, yelp_reviews_url: value })} />
+          </div>
+          <div className="md:col-span-2">
+            <TextArea
+              label="Entrance photo URLs"
+              value={template.entrance_photo_urls}
+              helper="One URL per line."
+              onChange={(value) => setTemplate({ ...template, entrance_photo_urls: value })}
+            />
+          </div>
+          <div className="md:col-span-2">
+            <UploadField
+              label="Upload entrance photos"
+              multiple
+              disabled={uploadingField === "entrance_photo_urls"}
+              onChange={(event) => handleImageUpload(event, "entrance_photo_urls", "entrance")}
+            />
+          </div>
+          <div className="md:col-span-2">
+            <TextArea
+              label="Review / trust image URLs"
+              value={template.review_photo_urls}
+              helper="One URL per line."
+              onChange={(value) => setTemplate({ ...template, review_photo_urls: value })}
+            />
+          </div>
+          <div className="md:col-span-2">
+            <UploadField
+              label="Upload review / trust images"
+              multiple
+              disabled={uploadingField === "review_photo_urls"}
+              onChange={(event) => handleImageUpload(event, "review_photo_urls", "reviews")}
+            />
+          </div>
+          <div className="md:col-span-2">
+            <TextArea
+              label="Featured reviews"
+              value={template.featured_reviews}
+              helper="One per line: Name | Review text | Source"
+              onChange={(value) => setTemplate({ ...template, featured_reviews: value })}
+            />
+          </div>
+        </div>
       </section>
 
       <div className="flex flex-wrap gap-3">
@@ -327,19 +330,19 @@ export function SettingsForm({ settings }: Props) {
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="rounded-full bg-ink px-5 py-3 text-sm font-medium text-white"
+          className="rounded-full bg-[#173d33] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#113328] disabled:opacity-70"
         >
           {saving ? "Saving..." : "Save settings"}
         </button>
         <Link
           href="/dashboard"
-          className="rounded-full border border-black/10 px-5 py-3 text-sm font-medium text-ink"
+          className="rounded-full border border-[#d9d0c5] bg-[#fcfaf6] px-5 py-3 text-sm font-semibold text-[#1f1a16]"
         >
           Back to dashboard
         </Link>
       </div>
 
-      {status ? <p className="text-sm text-black/65">{status}</p> : null}
+      {status ? <p className="text-sm text-[#5d5348]">{status}</p> : null}
     </div>
   );
 }
@@ -356,7 +359,7 @@ function UploadField({
   disabled?: boolean;
 }) {
   return (
-    <label className="block text-sm font-medium text-ink">
+    <label className="block text-sm font-medium text-[#2d2923]">
       {label}
       <input
         type="file"
@@ -364,35 +367,40 @@ function UploadField({
         multiple={multiple}
         disabled={disabled}
         onChange={onChange}
-        className="mt-2 block w-full rounded-2xl border border-black/10 bg-[#faf7f0] px-4 py-3"
+        className="mt-2 block w-full rounded-[1.1rem] border border-[#d8cdbc] bg-[#fcfaf6] px-4 py-3"
       />
     </label>
   );
 }
 
-function TemplateField({
+function TextField({
   label,
   value,
-  onChange
+  onChange,
+  type = "text",
+  placeholder
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  type?: string;
+  placeholder?: string;
 }) {
   return (
-    <label className="block text-sm font-medium text-ink">
+    <label className="block text-sm font-medium text-[#2d2923]">
       {label}
       <input
-        type="text"
+        type={type}
         value={value}
+        placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-2 w-full rounded-2xl border border-black/10 bg-[#faf7f0] px-4 py-3"
+        className="mt-2 w-full rounded-[1.1rem] border border-[#d8cdbc] bg-[#fcfaf6] px-4 py-3 text-[#1f1a16]"
       />
     </label>
   );
 }
 
-function TemplateArea({
+function TextArea({
   label,
   value,
   helper,
@@ -404,15 +412,15 @@ function TemplateArea({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="block text-sm font-medium text-ink">
+    <label className="block text-sm font-medium text-[#2d2923]">
       {label}
       <textarea
         value={value}
         onChange={(event) => onChange(event.target.value)}
         rows={4}
-        className="mt-2 w-full rounded-2xl border border-black/10 bg-[#faf7f0] px-4 py-3"
+        className="mt-2 w-full rounded-[1.1rem] border border-[#d8cdbc] bg-[#fcfaf6] px-4 py-3 text-[#1f1a16]"
       />
-      <span className="mt-2 block text-xs text-black/50">{helper}</span>
+      <span className="mt-2 block text-xs text-[#7a7065]">{helper}</span>
     </label>
   );
 }

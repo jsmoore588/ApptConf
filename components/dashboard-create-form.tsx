@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { startTransition, useState } from "react";
 
-type AdvisorProfile = {
-  key: "jude" | "crystal";
-  label: string;
+type AdvisorUser = {
+  id: string;
+  display_name: string;
   advisor_name?: string;
   advisor_phone?: string;
   advisor_photo_url?: string;
@@ -12,7 +12,8 @@ type AdvisorProfile = {
 };
 
 type Props = {
-  advisorProfiles: AdvisorProfile[];
+  advisors: AdvisorUser[];
+  currentUserId: string;
 };
 
 function toIso(dateValue: string, timeValue: string) {
@@ -24,15 +25,16 @@ function toIso(dateValue: string, timeValue: string) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-export function DashboardCreateForm({ advisorProfiles }: Props) {
+export function DashboardCreateForm({ advisors, currentUserId }: Props) {
   const [customerName, setCustomerName] = useState("");
   const [vehicle, setVehicle] = useState("");
   const [appointmentDate, setAppointmentDate] = useState("");
   const [appointmentTime, setAppointmentTime] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
-  const [selectedAdvisor, setSelectedAdvisor] = useState<"jude" | "crystal">("jude");
+  const [selectedAdvisorId, setSelectedAdvisorId] = useState(currentUserId);
   const [status, setStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const selectedAdvisor = advisors.find((advisor) => advisor.id === selectedAdvisorId) || advisors[0];
 
   async function handleSubmit() {
     const appointmentAt = toIso(appointmentDate, appointmentTime);
@@ -54,7 +56,7 @@ export function DashboardCreateForm({ advisorProfiles }: Props) {
           vehicle: vehicle.trim(),
           appointment_at: appointmentAt,
           customer_phone: customerPhone.trim(),
-          advisor_key: selectedAdvisor,
+          advisor_user_id: selectedAdvisorId,
           source: "dashboard"
         })
       });
@@ -71,11 +73,13 @@ export function DashboardCreateForm({ advisorProfiles }: Props) {
       }
 
       setStatus("Link created, copied, and opened in a new tab.");
-      setCustomerName("");
-      setVehicle("");
-      setAppointmentDate("");
-      setAppointmentTime("");
-      setCustomerPhone("");
+      startTransition(() => {
+        setCustomerName("");
+        setVehicle("");
+        setAppointmentDate("");
+        setAppointmentTime("");
+        setCustomerPhone("");
+      });
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Unable to create appointment");
     } finally {
@@ -84,49 +88,70 @@ export function DashboardCreateForm({ advisorProfiles }: Props) {
   }
 
   return (
-    <section className="mt-6 rounded-[2rem] border border-black/5 bg-white/75 p-6 shadow-card backdrop-blur">
-      <div className="flex flex-col gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-black/40">Create Link</p>
-        <h2 className="text-2xl font-semibold text-ink">Generate a customer link from the dashboard</h2>
-        <p className="text-sm leading-7 text-black/60">
-          Choose the appraiser first, then create the appointment page without using the extension.
-        </p>
-      </div>
+    <section className="rounded-[2rem] border border-[#d6cfbf] bg-[linear-gradient(135deg,#f7f3eb_0%,#efe6da_50%,#e8ddce_100%)] p-6 shadow-[0_30px_80px_rgba(38,27,16,0.12)]">
+      <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="rounded-[1.8rem] bg-[#173d33] p-5 text-white">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/50">Create Link</p>
+          <h2 className="mt-3 text-3xl font-semibold leading-tight">Build a customer page without leaving the dashboard</h2>
+          <p className="mt-3 text-sm leading-7 text-white/76">
+            Pick the appraiser, lock in the time, and generate a ready-to-send page in one pass.
+          </p>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-2">
-        <Field label="Customer name" value={customerName} onChange={setCustomerName} placeholder="Customer name" />
-        <Field label="Vehicle" value={vehicle} onChange={setVehicle} placeholder="2021 Toyota Highlander" />
-        <Field label="Date" type="date" value={appointmentDate} onChange={setAppointmentDate} />
-        <Field label="Time" type="time" value={appointmentTime} onChange={setAppointmentTime} />
-        <Field label="Customer phone" value={customerPhone} onChange={setCustomerPhone} placeholder="2515551234" />
-        <label className="block text-sm font-medium text-ink">
-          Appraiser
-          <select
-            value={selectedAdvisor}
-            onChange={(event) => setSelectedAdvisor(event.target.value as "jude" | "crystal")}
-            className="mt-2 w-full rounded-2xl border border-black/10 bg-[#faf7f0] px-4 py-3"
-          >
-            {advisorProfiles.map((profile) => (
-              <option key={profile.key} value={profile.key}>
-                {profile.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+          {selectedAdvisor ? (
+            <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-white/6 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/45">Default advisor</p>
+              <p className="mt-3 text-2xl font-semibold">
+                {selectedAdvisor.advisor_name || selectedAdvisor.display_name}
+              </p>
+              <div className="mt-3 space-y-1 text-sm text-white/70">
+                <p>{selectedAdvisor.advisor_email || "No email saved yet"}</p>
+                <p>{selectedAdvisor.advisor_phone || "No phone saved yet"}</p>
+              </div>
+            </div>
+          ) : null}
+        </div>
 
-      <div className="mt-5 flex flex-wrap gap-3">
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={submitting}
-          className="rounded-full bg-ink px-5 py-3 text-sm font-medium text-white"
-        >
-          {submitting ? "Creating..." : "Create link"}
-        </button>
-      </div>
+        <div className="rounded-[1.8rem] border border-white/50 bg-white/72 p-5 backdrop-blur">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="Customer name" value={customerName} onChange={setCustomerName} placeholder="Courtney Mason" />
+            <Field label="Vehicle" value={vehicle} onChange={setVehicle} placeholder="2021 Toyota Highlander" />
+            <Field label="Date" type="date" value={appointmentDate} onChange={setAppointmentDate} />
+            <Field label="Time" type="time" value={appointmentTime} onChange={setAppointmentTime} />
+            <Field label="Customer phone" value={customerPhone} onChange={setCustomerPhone} placeholder="2515551234" />
+            <label className="block text-sm font-medium text-[#2d2923]">
+              Appraiser
 
-      {status ? <p className="mt-4 text-sm text-black/65">{status}</p> : null}
+              <select
+                value={selectedAdvisorId}
+                onChange={(event) => setSelectedAdvisorId(event.target.value)}
+                className="mt-2 w-full rounded-[1.1rem] border border-[#d8cdbc] bg-[#fcfaf6] px-4 py-3 text-[#1f1a16]"
+              >
+                {advisors.map((advisor) => (
+                  <option key={advisor.id} value={advisor.id}>
+                    {advisor.advisor_name || advisor.display_name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={submitting}
+              className="rounded-full bg-[#173d33] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#113328] disabled:opacity-70"
+            >
+              {submitting ? "Creating..." : "Create and open link"}
+            </button>
+            <div className="rounded-full border border-[#d9d0c5] bg-[#fcfaf6] px-4 py-3 text-sm text-[#625a51]">
+              The link is copied automatically after it is created.
+            </div>
+          </div>
+
+          {status ? <p className="mt-4 text-sm text-[#5c5148]">{status}</p> : null}
+        </div>
+      </div>
     </section>
   );
 }
@@ -145,14 +170,14 @@ function Field({
   type?: string;
 }) {
   return (
-    <label className="block text-sm font-medium text-ink">
+    <label className="block text-sm font-medium text-[#2d2923]">
       {label}
       <input
         type={type}
         value={value}
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-2 w-full rounded-2xl border border-black/10 bg-[#faf7f0] px-4 py-3"
+        className="mt-2 w-full rounded-[1.1rem] border border-[#d8cdbc] bg-[#fcfaf6] px-4 py-3 text-[#1f1a16]"
       />
     </label>
   );

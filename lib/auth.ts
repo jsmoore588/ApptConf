@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { getUserById } from "@/lib/users";
 
 const SESSION_COOKIE = "appointment_engine_session";
 
@@ -21,9 +22,29 @@ async function sign(value: string) {
     .join("");
 }
 
-export async function createSessionToken(email: string) {
-  const normalized = email.trim().toLowerCase();
-  return `${normalized}.${await sign(normalized)}`;
+function randomSalt() {
+  return crypto.randomUUID().replace(/-/g, "");
+}
+
+export async function hashPassword(password: string, salt = randomSalt()) {
+  const digest = await sign(`${salt}:${password}`);
+  return `${salt}.${digest}`;
+}
+
+export async function verifyPassword(password: string, storedHash: string) {
+  const index = storedHash.indexOf(".");
+
+  if (index <= 0) {
+    return false;
+  }
+
+  const salt = storedHash.slice(0, index);
+  const digest = storedHash.slice(index + 1);
+  return (await sign(`${salt}:${password}`)) === digest;
+}
+
+export async function createSessionToken(userId: string) {
+  return `${userId}.${await sign(userId)}`;
 }
 
 export async function verifySessionToken(token?: string) {
@@ -37,14 +58,52 @@ export async function verifySessionToken(token?: string) {
     return false;
   }
 
-  const email = token.slice(0, index);
+  const userId = token.slice(0, index);
   const signature = token.slice(index + 1);
-  return (await sign(email)) === signature;
+  return (await sign(userId)) === signature;
+}
+
+export async function getSessionUserId() {
+  const store = await cookies();
+  const token = store.get(SESSION_COOKIE)?.value;
+
+  if (!(await verifySessionToken(token))) {
+    return null;
+  }
+
+  const index = token?.lastIndexOf(".") ?? -1;
+  return index > 0 && token ? token.slice(0, index) : null;
 }
 
 export async function isAuthenticated() {
-  const store = await cookies();
-  return verifySessionToken(store.get(SESSION_COOKIE)?.value);
+  return Boolean(await getSessionUserId());
+}
+
+export async function getCurrentUser() {
+  const userId = await getSessionUserId();
+
+  if (!userId) {
+    return null;
+  }
+
+  if (userId.startsWith("legacy:")) {
+    const email = userId.slice("legacy:".length) || process.env.DASHBOARD_EMAIL || "admin@localhost";
+
+    return {
+      id: userId,
+      email,
+      display_name: "Owner",
+      password_hash: "",
+      advisor_name: "Jude",
+      advisor_phone: undefined,
+      advisor_email: email,
+      advisor_photo_url: undefined,
+      created_at: new Date(0).toISOString(),
+      updated_at: undefined
+    };
+  }
+
+  return getUserById(userId);
 }
 
 export function getSessionCookieName() {

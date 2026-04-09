@@ -141,6 +141,21 @@ create table if not exists app_settings (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists user_accounts (
+  id uuid primary key default gen_random_uuid(),
+  email text not null unique,
+  display_name text not null,
+  password_hash text not null,
+  advisor_name text,
+  advisor_phone text,
+  advisor_email text,
+  advisor_photo_url text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists user_accounts_email_idx on user_accounts (email);
+
 create or replace function set_updated_at()
 returns trigger as $$
 begin
@@ -158,5 +173,11 @@ execute function set_updated_at();
 drop trigger if exists app_settings_set_updated_at on app_settings;
 create trigger app_settings_set_updated_at
 before update on app_settings
+for each row
+execute function set_updated_at();
+
+drop trigger if exists user_accounts_set_updated_at on user_accounts;
+create trigger user_accounts_set_updated_at
+before update on user_accounts
 for each row
 execute function set_updated_at();

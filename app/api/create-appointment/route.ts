@@ -6,6 +6,7 @@ import { parseAppointmentTime, formatAppointmentDate } from "@/lib/datetime";
 import { createGoogleCalendarEvent } from "@/lib/calendar";
 import { DEFAULT_LOCATION_ADDRESS, DEFAULT_LOCATION_NAME } from "@/lib/constants";
 import { getAppSettings } from "@/lib/app-settings";
+import { getUserById } from "@/lib/users";
 
 type CreatePayload = {
   name?: string;
@@ -14,6 +15,7 @@ type CreatePayload = {
   time?: string;
   appointment_at?: string;
   advisor?: string;
+  advisor_user_id?: string;
   advisor_key?: "jude" | "crystal";
   advisor_name?: string;
   advisor_phone?: string;
@@ -53,17 +55,36 @@ function cleanReviews(values?: FeaturedReview[]) {
   );
 }
 
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (error && typeof error === "object") {
+    const maybeMessage = Reflect.get(error, "message");
+
+    if (typeof maybeMessage === "string" && maybeMessage) {
+      return maybeMessage;
+    }
+  }
+
+  return "Unknown error";
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as CreatePayload;
     const appSettings = await getAppSettings();
     const template = appSettings.templateDefaults || {};
+    const selectedUser = body.advisor_user_id ? await getUserById(body.advisor_user_id) : null;
     const selectedAdvisor = appSettings.advisorProfiles?.find((profile) => profile.key === body.advisor_key);
 
     const customerName = body.customer_name?.trim() || body.name?.trim();
     const advisorName =
       body.advisor_name?.trim() ||
       body.advisor?.trim() ||
+      selectedUser?.advisor_name?.trim() ||
+      selectedUser?.display_name?.trim() ||
       selectedAdvisor?.advisor_name?.trim() ||
       template.advisor_name?.trim();
     const appointmentAt = body.appointment_at || (body.time ? parseAppointmentTime(body.time) : null);
@@ -91,9 +112,13 @@ export async function POST(request: NextRequest) {
       advisor_name: advisorName,
       advisor: advisorName,
       advisor_phone:
-        body.advisor_phone?.trim() || selectedAdvisor?.advisor_phone?.trim() || template.advisor_phone,
+        body.advisor_phone?.trim() ||
+        selectedUser?.advisor_phone?.trim() ||
+        selectedAdvisor?.advisor_phone?.trim() ||
+        template.advisor_phone,
       advisor_photo_url:
         body.advisor_photo_url?.trim() ||
+        selectedUser?.advisor_photo_url?.trim() ||
         selectedAdvisor?.advisor_photo_url?.trim() ||
         template.advisor_photo_url,
       appointment_page_url: pageUrl,
@@ -105,7 +130,11 @@ export async function POST(request: NextRequest) {
       mileage: body.mileage?.trim(),
       notes: body.notes?.trim(),
       phone: body.phone?.trim(),
-      email: body.email?.trim() || body.advisor_email?.trim() || selectedAdvisor?.advisor_email?.trim(),
+      email:
+        body.email?.trim() ||
+        body.advisor_email?.trim() ||
+        selectedUser?.advisor_email?.trim() ||
+        selectedAdvisor?.advisor_email?.trim(),
       customer_phone: body.customer_phone?.trim(),
       confirmed: false,
       opened_count: 0,
@@ -135,10 +164,7 @@ export async function POST(request: NextRequest) {
       savedAppointment = await createAppointment(draftAppointment);
     } catch (error) {
       console.error("Appointment save failed", error);
-      return NextResponse.json(
-        { error: error instanceof Error ? error.message : "Unable to save appointment" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
     }
 
     let calendarEventId: string | null = null;
@@ -177,9 +203,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Create appointment route failed", error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Create appointment route failed" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
   }
 }

@@ -68,7 +68,7 @@ export async function createGoogleCalendarEvent(input: CreateCalendarEventInput)
   const attendees = [input.email, notifyEmail].filter(Boolean).map((email) => ({ email: email as string }));
 
   const body = {
-    summary: `Appraisal - ${input.name} (${input.vehicle})`,
+    summary: `Appointment to Sell ${input.vehicle}`,
     description,
     location,
     start: {

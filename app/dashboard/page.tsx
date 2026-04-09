@@ -1,20 +1,32 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getDashboardMetrics } from "@/lib/storage";
-import { isAuthenticated } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { generateActionSummary } from "@/lib/openai";
-import { getPublicAppSettings } from "@/lib/app-settings";
 import { DashboardCreateForm } from "@/components/dashboard-create-form";
+import { listAdvisorUsers } from "@/lib/users";
 
 export default async function DashboardPage() {
-  const authenticated = await isAuthenticated();
+  const currentUser = await getCurrentUser();
 
-  if (!authenticated) {
+  if (!currentUser) {
     redirect("/login");
   }
 
-  const dashboard = await getDashboardMetrics();
-  const settings = await getPublicAppSettings();
+  const [dashboard, teamMembers] = await Promise.all([getDashboardMetrics(), listAdvisorUsers()]);
+  const advisors =
+    teamMembers.length > 0
+      ? teamMembers
+      : [
+          {
+            id: currentUser.id,
+            display_name: currentUser.display_name,
+            advisor_name: currentUser.advisor_name,
+            advisor_phone: currentUser.advisor_phone,
+            advisor_photo_url: currentUser.advisor_photo_url,
+            advisor_email: currentUser.advisor_email
+          }
+        ];
   let aiSummary: string | null = null;
 
   try {
@@ -27,177 +39,168 @@ export default async function DashboardPage() {
     aiSummary = null;
   }
 
+  const needsAttention = dashboard.allAppointments.filter(
+    (appointment) => appointment.priority === "high" || appointment.status === "running_late"
+  );
+  const confirmed = dashboard.allAppointments.filter((appointment) => appointment.status === "confirmed");
+
   return (
-    <main className="mx-auto min-h-screen w-full max-w-7xl px-4 py-6 md:px-8 md:py-8">
-      <section className="rounded-[2rem] border border-black/5 bg-white/75 p-6 shadow-card backdrop-blur md:p-8">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-black/40">
-              Dashboard
-            </p>
-            <h1 className="mt-2 text-3xl font-semibold text-ink md:text-5xl">
-              Every appointment, with the urgent ones surfaced first
-            </h1>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href="/dashboard/settings"
-              className="inline-flex rounded-full border border-black/10 px-4 py-3 text-sm font-medium text-ink"
-            >
-              Edit template
-            </Link>
-            <Link
-              href="/"
-              className="inline-flex rounded-full border border-black/10 px-4 py-3 text-sm font-medium text-ink"
-            >
-              Back home
-            </Link>
-            <form action="/api/auth/logout" method="post">
-              <button className="inline-flex rounded-full bg-ink px-4 py-3 text-sm font-medium text-white">
-                Log out
-              </button>
-            </form>
-          </div>
-        </div>
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(200,174,127,0.22),transparent_28%),linear-gradient(180deg,#f8f3ea_0%,#efe6da_52%,#ece2d4_100%)] px-4 py-5 text-[#16130f] sm:px-6 sm:py-8">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+        <section className="overflow-hidden rounded-[2.2rem] border border-[#d8cfbf] bg-[#173d33] p-6 text-white shadow-[0_32px_90px_rgba(20,42,35,0.24)] sm:p-8">
+          <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/50">Dashboard</p>
+              <h1 className="mt-3 max-w-3xl text-4xl font-semibold leading-tight sm:text-5xl">
+                {currentUser.display_name}, here&apos;s the full board.
+              </h1>
+              <p className="mt-4 max-w-2xl text-[16px] leading-8 text-white/74">
+                Your default advisor info follows your account, your coworker can use her own login,
+                and every appointment is visible in one place instead of getting buried in a day-only view.
+              </p>
 
-        <div className="mt-8 grid gap-4 md:grid-cols-4">
-          <MetricCard label="Show rate" value={`${dashboard.showRate}%`} />
-          <MetricCard label="Confirmation rate" value={`${dashboard.confirmationRate}%`} />
-          <MetricCard label="Open rate" value={`${dashboard.openRate}%`} />
-          <MetricCard label="High-intent" value={dashboard.highIntent.toString()} />
-        </div>
-      </section>
-
-      <DashboardCreateForm advisorProfiles={settings.advisorProfiles} />
-
-      <section className="mt-6 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-        <div className="rounded-[2rem] border border-black/5 bg-[#1d2a26] p-6 text-white shadow-card">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/50">
-            AI Action Panel
-          </p>
-          {aiSummary ? (
-            <div className="mt-4 rounded-[1.3rem] bg-white/5 p-4 text-sm leading-7 text-white/85">
-              {aiSummary}
-            </div>
-          ) : null}
-          <div className="mt-4 space-y-3 text-sm leading-7 text-white/80">
-            {dashboard.suggestions.length > 0 ? (
-              dashboard.suggestions.map((suggestion) => (
-                <div key={suggestion} className="rounded-[1.3rem] bg-white/5 p-4">
-                  {suggestion}
-                </div>
-              ))
-            ) : (
-              <div className="rounded-[1.3rem] bg-white/5 p-4">
-                No urgent intervention signals right now.
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Link
+                  href="/dashboard/settings"
+                  className="rounded-full border border-white/14 bg-white/8 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/14"
+                >
+                  Edit account and template
+                </Link>
+                <form action="/api/auth/logout" method="post">
+                  <button className="rounded-full border border-white/14 bg-transparent px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10">
+                    Log out
+                  </button>
+                </form>
               </div>
-            )}
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FocusCard label="Your default advisor" value={currentUser.advisor_name || currentUser.display_name} />
+              <FocusCard label="Team members" value={String(advisors.length)} />
+              <FocusCard label="Needs attention" value={String(needsAttention.length)} />
+              <FocusCard label="Confirmed" value={String(confirmed.length)} />
+            </div>
           </div>
-        </div>
+        </section>
 
-        <div className="rounded-[2rem] border border-black/5 bg-white/75 p-6 shadow-card backdrop-blur">
-          <SectionHeader
-            eyebrow="Today"
-            title="Appointments scheduled for today"
-            subtitle="Status reflects confirmations, late arrivals, reschedule requests, and cancellations."
-          />
-        <div className="mt-5 grid gap-4">
-          {dashboard.todayAppointments.length > 0 ? (
-            dashboard.todayAppointments.map((appointment) => (
-              <AppointmentCard key={appointment.id} appointment={appointment} />
-              ))
-            ) : (
-              <EmptyState label="No appointments on today's board." />
-            )}
+        <DashboardCreateForm advisors={advisors} currentUserId={currentUser.id} />
+
+        <section className="grid gap-6 xl:grid-cols-[0.78fr_1.22fr]">
+          <div className="space-y-6">
+            <section className="rounded-[1.9rem] border border-[#d8cfbf] bg-white/78 p-6 shadow-[0_18px_45px_rgba(38,27,16,0.08)] backdrop-blur">
+              <SectionEyebrow label="Quick Read" />
+              <h2 className="mt-3 text-2xl font-semibold text-[#181510]">What matters right now</h2>
+              <div className="mt-5 space-y-3 text-sm leading-7 text-[#574e44]">
+                {aiSummary ? (
+                  <div className="rounded-[1.3rem] border border-[#ece2d5] bg-[#fcfaf6] p-4">{aiSummary}</div>
+                ) : null}
+                {dashboard.suggestions.length > 0 ? (
+                  dashboard.suggestions.map((suggestion) => (
+                    <div key={suggestion} className="rounded-[1.3rem] border border-[#ece2d5] bg-[#fcfaf6] p-4">
+                      {suggestion}
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-[1.3rem] border border-[#ece2d5] bg-[#fcfaf6] p-4">
+                    No urgent intervention signals right now.
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className="rounded-[1.9rem] border border-[#d8cfbf] bg-white/78 p-6 shadow-[0_18px_45px_rgba(38,27,16,0.08)] backdrop-blur">
+              <SectionEyebrow label="Metrics" />
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <MetricCard label="Show rate" value={`${dashboard.showRate}%`} />
+                <MetricCard label="Confirmation" value={`${dashboard.confirmationRate}%`} />
+                <MetricCard label="Open rate" value={`${dashboard.openRate}%`} />
+                <MetricCard label="High intent" value={String(dashboard.highIntent)} />
+              </div>
+            </section>
           </div>
-        </div>
-      </section>
 
-      <section className="mt-6 rounded-[2rem] border border-black/5 bg-white/75 p-6 shadow-card backdrop-blur">
-        <SectionHeader
-          eyebrow="All Appointments"
-          title="Full appointment list"
-          subtitle="This shows every appointment in the database, not just today's board."
-        />
-        <div className="mt-5 grid gap-4">
-          {dashboard.allAppointments.length > 0 ? (
-            dashboard.allAppointments.map((appointment) => (
-              <AppointmentCard key={appointment.id} appointment={appointment} />
-            ))
-          ) : (
-            <EmptyState label="No appointments found yet." />
-          )}
-        </div>
-      </section>
+          <div className="space-y-6">
+            <AppointmentSection
+              eyebrow="Needs attention"
+              title="The appointments that need intervention first"
+              subtitle="High-priority appointments surface first so the board feels operational instead of decorative."
+              appointments={needsAttention}
+              emptyLabel="Nothing urgent right now."
+            />
 
-      <section className="mt-6 rounded-[2rem] border border-black/5 bg-white/75 p-6 shadow-card backdrop-blur">
-        <SectionHeader
-          eyebrow="Tomorrow"
-          title="Needs Confirmation"
-          subtitle="Tomorrow's appointments should be pushed toward a micro-commitment."
-        />
-        <div className="mt-5 grid gap-4">
-          {dashboard.tomorrowAppointments.length > 0 ? (
-            dashboard.tomorrowAppointments.map((appointment) => (
-              <AppointmentCard key={appointment.id} appointment={appointment} tomorrow />
-            ))
-          ) : (
-            <EmptyState label="No appointments lined up for tomorrow." />
-          )}
-        </div>
-      </section>
+            <AppointmentSection
+              eyebrow="All appointments"
+              title="Every appointment in one portfolio view"
+              subtitle="This board is no longer limited to today. It shows the whole pipeline."
+              appointments={dashboard.allAppointments}
+              emptyLabel="No appointments found yet."
+            />
 
-      <section className="mt-6 rounded-[2rem] border border-black/5 bg-white/75 p-6 shadow-card backdrop-blur">
-        <SectionHeader
-          eyebrow="Debug"
-          title="Overdue and persistence debug"
-          subtitle="Temporary visibility to confirm every appointment exists in the database and is queryable."
-        />
-        <div className="mt-5 grid gap-4">
-          {dashboard.overdueAppointments.length > 0 ? (
-            dashboard.overdueAppointments.map((appointment) => (
-              <AppointmentCard key={appointment.id} appointment={appointment} debug />
-            ))
-          ) : (
-            <EmptyState label="No overdue appointments right now." />
-          )}
-        </div>
-      </section>
+            <section className="grid gap-6 lg:grid-cols-2">
+              <AppointmentSection
+                eyebrow="Today"
+                title="Today"
+                subtitle="Live appointments happening today."
+                appointments={dashboard.todayAppointments}
+                emptyLabel="No appointments on today’s board."
+                compact
+              />
+              <AppointmentSection
+                eyebrow="Tomorrow"
+                title="Tomorrow"
+                subtitle="Tomorrow’s appointments that still need momentum."
+                appointments={dashboard.tomorrowAppointments}
+                emptyLabel="No appointments lined up for tomorrow."
+                compact
+              />
+            </section>
+          </div>
+        </section>
+      </div>
     </main>
   );
 }
 
-function SectionHeader({
-  eyebrow,
-  title,
-  subtitle
-}: {
-  eyebrow: string;
-  title: string;
-  subtitle: string;
-}) {
+function SectionEyebrow({ label }: { label: string }) {
+  return <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#8a6f50]">{label}</p>;
+}
+
+function FocusCard({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-black/40">{eyebrow}</p>
-      <h2 className="mt-2 text-2xl font-semibold text-ink">{title}</h2>
-      <p className="mt-2 text-sm leading-7 text-black/60">{subtitle}</p>
+    <div className="rounded-[1.45rem] border border-white/10 bg-white/6 p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/48">{label}</p>
+      <p className="mt-3 text-2xl font-semibold text-white">{value}</p>
     </div>
   );
 }
 
-function AppointmentCard({
-  appointment,
-  tomorrow = false,
-  debug = false
+function MetricCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[1.45rem] border border-[#ece2d5] bg-[#fcfaf6] p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6f50]">{label}</p>
+      <p className="mt-3 text-3xl font-semibold text-[#171410]">{value}</p>
+    </div>
+  );
+}
+
+function AppointmentSection({
+  eyebrow,
+  title,
+  subtitle,
+  appointments,
+  emptyLabel,
+  compact = false
 }: {
-  appointment: {
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  appointments: Array<{
     id: string;
     name: string;
     vehicle: string;
     formattedTime: string;
     appointment_at?: string;
     appointment_page_url?: string;
-    google_calendar_event_id?: string;
     created_at: string;
     source?: string;
     status:
@@ -212,77 +215,106 @@ function AppointmentCard({
     priority: "high" | "normal" | "low";
     phone?: string;
     advisor_phone?: string;
+  }>;
+  emptyLabel: string;
+  compact?: boolean;
+}) {
+  return (
+    <section className="rounded-[1.9rem] border border-[#d8cfbf] bg-white/78 p-6 shadow-[0_18px_45px_rgba(38,27,16,0.08)] backdrop-blur">
+      <SectionEyebrow label={eyebrow} />
+      <h2 className="mt-3 text-2xl font-semibold text-[#181510]">{title}</h2>
+      <p className="mt-2 text-sm leading-7 text-[#5f554b]">{subtitle}</p>
+
+      <div className="mt-5 grid gap-4">
+        {appointments.length > 0 ? (
+          appointments.map((appointment) => (
+            <AppointmentCard key={appointment.id} appointment={appointment} compact={compact} />
+          ))
+        ) : (
+          <div className="rounded-[1.35rem] border border-[#ece2d5] bg-[#fcfaf6] p-5 text-sm text-[#655b50]">
+            {emptyLabel}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function AppointmentCard({
+  appointment,
+  compact = false
+}: {
+  appointment: {
+    id: string;
+    name: string;
+    vehicle: string;
+    formattedTime: string;
+    status:
+      | "scheduled"
+      | "confirmed"
+      | "viewed"
+      | "running_late"
+      | "reschedule_requested"
+      | "canceled"
+      | "not_opened"
+      | "calendar_sync_failed";
+    priority: "high" | "normal" | "low";
+    phone?: string;
+    advisor_phone?: string;
   };
-  tomorrow?: boolean;
-  debug?: boolean;
+  compact?: boolean;
 }) {
   const statusTone =
     appointment.status === "confirmed"
-      ? "bg-[#d6e7db] text-[#224735]"
+      ? "bg-[#d9eadf] text-[#224735]"
       : appointment.status === "running_late"
         ? "bg-[#f3e3c9] text-[#835628]"
         : appointment.status === "reschedule_requested"
-          ? "bg-[#e7ddf3] text-[#5f3c82]"
-          : appointment.status === "canceled"
-            ? "bg-[#f0ddda] text-[#8b3d34]"
-      : appointment.status === "scheduled"
-        ? "bg-[#e5e2dd] text-[#4b4640]"
-        : appointment.status === "calendar_sync_failed"
-          ? "bg-[#f0ddda] text-[#8b3d34]"
-      : appointment.status === "viewed"
-        ? "bg-[#ece3d5] text-[#7a5328]"
-        : "bg-[#f0ddda] text-[#8b3d34]";
+          ? "bg-[#e6ddf3] text-[#5f3c82]"
+          : appointment.status === "canceled" || appointment.status === "calendar_sync_failed"
+            ? "bg-[#f1deda] text-[#8b3d34]"
+            : appointment.status === "viewed"
+              ? "bg-[#ece3d5] text-[#7a5328]"
+              : "bg-[#e5e2dd] text-[#4b4640]";
   const priorityTone =
     appointment.priority === "high"
       ? "bg-[#8b3d34] text-white"
       : appointment.priority === "low"
-        ? "bg-[#d6e7db] text-[#224735]"
-        : "bg-black/5 text-black/65";
+        ? "bg-[#d9eadf] text-[#224735]"
+        : "bg-black/6 text-black/65";
 
   return (
-    <div className="grid gap-4 rounded-[1.5rem] border border-black/5 bg-[#faf7f0] p-4 md:grid-cols-[1.2fr_0.9fr_auto]">
+    <div
+      className={`rounded-[1.45rem] border border-[#ece2d5] bg-[#fcfaf6] p-4 ${
+        compact ? "" : "md:grid md:grid-cols-[1.2fr_auto] md:items-center"
+      }`}
+    >
       <div>
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-lg font-semibold text-ink">{appointment.name}</p>
+          <p className="text-lg font-semibold text-[#171410]">{appointment.name}</p>
           <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase ${statusTone}`}>
-            {appointment.status.replace("_", " ")}
+            {appointment.status.replaceAll("_", " ")}
           </span>
           <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase ${priorityTone}`}>
-            {appointment.priority} priority
+            {appointment.priority}
           </span>
-          {tomorrow ? (
-            <span className="rounded-full bg-black/5 px-3 py-1 text-xs font-semibold uppercase text-black/55">
-              Needs Confirmation
-            </span>
-          ) : null}
         </div>
-        <p className="mt-2 text-sm text-black/65">{appointment.vehicle}</p>
-        <p className="mt-1 text-sm text-black/55">{appointment.formattedTime}</p>
-        {debug ? (
-          <div className="mt-3 space-y-1 text-xs text-black/45">
-            <p>ID: {appointment.id}</p>
-            <p>created_at: {appointment.created_at}</p>
-            <p>appointment_at: {appointment.appointment_at || "missing"}</p>
-            <p>calendar_event_id: {appointment.google_calendar_event_id || "none"}</p>
-            <p>status: {appointment.status}</p>
-            <p>source: {appointment.source || "extension"}</p>
-            <p>page_url: {appointment.appointment_page_url || "missing"}</p>
-          </div>
-        ) : null}
+        <p className="mt-2 text-sm text-[#322d27]">{appointment.vehicle}</p>
+        <p className="mt-1 text-sm text-[#6d6358]">{appointment.formattedTime}</p>
       </div>
 
-      <div className="flex flex-wrap gap-2 text-sm">
+      <div className="mt-4 flex flex-wrap gap-2 md:mt-0 md:justify-end">
         {(appointment.advisor_phone || appointment.phone) ? (
           <>
             <a
               href={`sms:${appointment.advisor_phone || appointment.phone}`}
-              className="inline-flex items-center rounded-full border border-black/10 px-4 py-2 font-medium text-ink"
+              className="rounded-full border border-[#ddd3c8] bg-white px-4 py-2 text-sm font-semibold text-[#27231e]"
             >
               Text
             </a>
             <a
               href={`tel:${appointment.advisor_phone || appointment.phone}`}
-              className="inline-flex items-center rounded-full border border-black/10 px-4 py-2 font-medium text-ink"
+              className="rounded-full border border-[#ddd3c8] bg-white px-4 py-2 text-sm font-semibold text-[#27231e]"
             >
               Call
             </a>
@@ -290,33 +322,11 @@ function AppointmentCard({
         ) : null}
         <Link
           href={`/appt/${appointment.id}`}
-          className="inline-flex items-center rounded-full border border-black/10 px-4 py-2 font-medium text-ink"
-        >
-          Resend link
-        </Link>
-      </div>
-
-      <div className="flex items-start justify-start md:justify-end">
-        <Link
-          href={`/appt/${appointment.id}`}
-          className="inline-flex rounded-full bg-ink px-4 py-2 text-sm font-medium text-white"
+          className="rounded-full bg-[#173d33] px-4 py-2 text-sm font-semibold text-white"
         >
           Open page
         </Link>
       </div>
     </div>
   );
-}
-
-function MetricCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[1.5rem] border border-black/5 bg-[#faf7f0] p-5">
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-black/40">{label}</p>
-      <p className="mt-3 text-3xl font-semibold text-ink">{value}</p>
-    </div>
-  );
-}
-
-function EmptyState({ label }: { label: string }) {
-  return <div className="rounded-[1.5rem] bg-[#faf7f0] p-5 text-sm text-black/60">{label}</div>;
 }
