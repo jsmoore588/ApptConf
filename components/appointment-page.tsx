@@ -148,8 +148,7 @@ export function AppointmentPage({ appointment }: Props) {
     ["arrival", "Arrival"],
     ["bring", "Bring"],
     ["visit", "Visit"],
-    ...(hasReviews ? [["reviews", "Reviews"]] : []),
-    ["help", "Help"]
+    ...(hasReviews ? [["reviews", "Reviews"]] : [])
   ] as Array<[SectionId, string]>;
 
   useEffect(() => {
@@ -288,13 +287,13 @@ export function AppointmentPage({ appointment }: Props) {
           </div>
         </section>
 
-        <section className="rounded-[30px] border border-white/15 bg-[#173d33]/92 p-5 text-white shadow-[0_24px_60px_rgba(18,44,36,0.22)] backdrop-blur-2xl">
+        <section className="rounded-[30px] border border-[#0f2f27]/35 bg-[#12382f] p-5 text-white shadow-[0_24px_60px_rgba(18,44,36,0.28)]">
           <div className="flex items-center gap-4">
             <SafeImage src={appointment.advisor_photo_url} alt={advisorName} className="h-16 w-16 rounded-[20px] object-cover ring-2 ring-white/15" fallback={<div className="flex h-16 w-16 items-center justify-center rounded-[20px] bg-white/10 text-2xl font-semibold">{advisorName.slice(0, 1)}</div>} />
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/45">Your advisor</p>
-              <h2 className="mt-1 text-2xl font-semibold">{advisorName}</h2>
-              <p className="mt-1 text-sm leading-6 text-white/72">I&apos;ll have everything ready when you get here.</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/70">Your advisor</p>
+              <h2 className="mt-1 text-2xl font-semibold text-white">{advisorName}</h2>
+              <p className="mt-1 text-sm leading-6 text-white/88">I&apos;ll have everything ready when you get here.</p>
             </div>
           </div>
           <button type="button" onClick={confirmAppointment} disabled={confirmed || busy} className={`mt-5 w-full rounded-full px-5 py-4 text-sm font-semibold transition active:scale-[0.99] ${confirmed ? "bg-[#dce9e1] text-[#1f4538]" : "bg-white text-[#173d33] hover:bg-[#f2ece2]"}`}>{confirmed ? "Confirmed" : `I'll be there at ${shortTime}`}</button>
@@ -503,7 +502,7 @@ function SectionNavigator({
       style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 10px)" }}
     >
       <div className="overflow-x-auto rounded-[26px] border border-white/65 bg-[#fffaf2]/76 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75),0_14px_38px_rgba(37,28,18,0.18)] backdrop-blur-2xl">
-        <div className="flex min-w-max justify-between gap-2">
+        <div className="grid min-w-max auto-cols-fr grid-flow-col gap-2">
           {items.map(([id, label]) => (
             <button
               key={id}
