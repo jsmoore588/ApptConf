@@ -267,12 +267,7 @@ export function AppointmentPage({ appointment }: Props) {
   }
 
   function sectionClass(id: SectionId, extra = "") {
-    const active = activeSection === id;
-    return `scroll-mt-6 rounded-[30px] border p-6 shadow-[0_22px_60px_rgba(45,35,24,0.09)] backdrop-blur-2xl transition-all duration-300 ${
-      active
-        ? "border-[#b9c8bc] bg-white/82 ring-2 ring-[#173d33]/18"
-        : "border-white/55 bg-white/58"
-    } ${extra}`;
+    return `scroll-mt-6 rounded-[30px] border border-white/55 bg-white/58 p-6 shadow-[0_22px_60px_rgba(45,35,24,0.09)] backdrop-blur-2xl ${extra}`;
   }
 
   return (
