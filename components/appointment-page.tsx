@@ -1,125 +1,41 @@
 "use client";
 
-import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Cormorant_Garamond, Plus_Jakarta_Sans } from "next/font/google";
-import { AnimatePresence, motion } from "framer-motion";
 import { Appointment } from "@/lib/types";
 import { formatAppointmentDate } from "@/lib/datetime";
 import { DEFAULT_LOCATION_ADDRESS, DEFAULT_LOCATION_NAME } from "@/lib/constants";
 
-type Props = {
-  appointment: Appointment;
-};
+type Props = { appointment: Appointment };
+type SectionId = "top" | "arrival" | "visit" | "bring" | "reviews" | "help";
 
-const displayFont = Cormorant_Garamond({
-  subsets: ["latin"],
-  weight: ["500", "600", "700"]
-});
+const displayFont = Cormorant_Garamond({ subsets: ["latin"], weight: ["500", "600", "700"] });
+const bodyFont = Plus_Jakarta_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-const bodyFont = Plus_Jakarta_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"]
-});
-
-const arrivalSteps = [
-  "Pull into the front lot",
-  "Park near the buying center entrance",
-  "Come inside and ask for your advisor"
-];
-
-const expectationSteps = [
-  { label: "Walkaround", time: "~15 min", detail: "Quick look over the vehicle to confirm overall condition." },
-  { label: "Market review", time: "~10 min", detail: "We show you the real market and where the numbers come from." },
-  { label: "Offer", time: "~10-15 min", detail: "We wrap with a straightforward offer and next steps." }
-];
+const visitSteps = [
+  ["Walkaround", "~15 min", "A quick look over the vehicle and overall condition."],
+  ["Market review", "~10 min", "A straightforward review of current market numbers."],
+  ["Offer", "~10-15 min", "A clear offer and next steps if you want to move forward."]
+] as const;
 
 const bringItems = [
-  { label: "Title (if you have it)", detail: "If it is available, bringing it can speed things up." },
-  { label: "Payoff info (if applicable)", detail: "A recent payoff amount helps if there is money still owed." },
-  { label: "Keys", detail: "Bring every key you have so the visit stays simple." }
-];
+  ["Title (if you have it)", "Helpful, but not required for every visit."],
+  ["Payoff info (if applicable)", "Useful if there is still money owed on the vehicle."],
+  ["Keys", "Bring every key you have."]
+] as const;
 
-function createGoogleCalendarLink(appointment: Appointment, startLabel: string) {
-  if (!appointment.appointment_at) {
-    return null;
-  }
-
-  const start = new Date(appointment.appointment_at);
-  const end = new Date(start);
-  end.setHours(end.getHours() + 1);
-
-  const dateText = `${toGoogleDate(start)}/${toGoogleDate(end)}`;
-  const text = encodeURIComponent(`Appointment to Sell ${appointment.vehicle}`);
-  const details = encodeURIComponent(
-    `Vehicle: ${appointment.vehicle}\nTime: ${startLabel}\nAdvisor: ${appointment.advisor_name || appointment.advisor}`
-  );
-  const location = encodeURIComponent(
-    appointment.location_address || appointment.location_name || `${DEFAULT_LOCATION_NAME}, ${DEFAULT_LOCATION_ADDRESS}`
-  );
-
-  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${dateText}&details=${details}&location=${location}`;
-}
-
-function createReminderFile(appointment: Appointment, startLabel: string) {
-  if (!appointment.appointment_at) {
-    return null;
-  }
-
-  const start = new Date(appointment.appointment_at);
-  const end = new Date(start);
-  end.setHours(end.getHours() + 1);
-  const safeName = (appointment.name || "appointment").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
-  const lines = [
-    "BEGIN:VCALENDAR",
-    "VERSION:2.0",
-    "PRODID:-//Appointment Engine//EN",
-    "BEGIN:VEVENT",
-    `UID:${appointment.id}@appointment-engine`,
-    `DTSTAMP:${toGoogleDate(new Date())}`,
-    `DTSTART:${toGoogleDate(start)}`,
-    `DTEND:${toGoogleDate(end)}`,
-    `SUMMARY:Appointment to Sell ${escapeIcsText(appointment.vehicle)}`,
-    `DESCRIPTION:${escapeIcsText(`Vehicle: ${appointment.vehicle}\\nTime: ${startLabel}\\nAdvisor: ${appointment.advisor_name || appointment.advisor || "Advisor"}`)}`,
-    `LOCATION:${escapeIcsText(appointment.location_address || appointment.location_name || `${DEFAULT_LOCATION_NAME}, ${DEFAULT_LOCATION_ADDRESS}`)}`,
-    "BEGIN:VALARM",
-    "TRIGGER:-PT2H",
-    "ACTION:DISPLAY",
-    `DESCRIPTION:${escapeIcsText(`Reminder for ${appointment.name}'s sell appointment`)}`,
-    "END:VALARM",
-    "BEGIN:VALARM",
-    "TRIGGER:-PT30M",
-    "ACTION:DISPLAY",
-    `DESCRIPTION:${escapeIcsText(`Reminder for ${appointment.name}'s sell appointment`)}`,
-    "END:VALARM",
-    "END:VEVENT",
-    "END:VCALENDAR"
-  ];
-
-  return {
-    filename: `${safeName || "appointment"}-reminder.ics`,
-    content: lines.join("\r\n")
-  };
-}
-
-function escapeIcsText(value: string) {
-  return value.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
+function firstName(value: string) {
+  return value.trim().split(/\s+/)[0] || value;
 }
 
 function toGoogleDate(value: Date) {
   return value.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
 }
 
-function formatShortTime(dateText?: string) {
-  if (!dateText) {
-    return null;
-  }
-
-  const date = new Date(dateText);
-
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
+function formatShortTime(value?: string) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
   return new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Chicago",
     hour: "numeric",
@@ -127,863 +43,494 @@ function formatShortTime(dateText?: string) {
   }).format(date);
 }
 
-function formatDayTime(dateText?: string) {
-  if (!dateText) {
-    return null;
-  }
-
-  const date = new Date(dateText);
-
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Chicago",
-    weekday: "long",
-    hour: "numeric",
-    minute: "2-digit"
-  }).format(date);
+function calendarLink(appointment: Appointment, label: string) {
+  if (!appointment.appointment_at) return null;
+  const start = new Date(appointment.appointment_at);
+  const end = new Date(start);
+  end.setHours(end.getHours() + 1);
+  const location = appointment.location_address || appointment.location_name || `${DEFAULT_LOCATION_NAME}, ${DEFAULT_LOCATION_ADDRESS}`;
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
+    `Appointment to Sell ${appointment.vehicle}`
+  )}&dates=${toGoogleDate(start)}/${toGoogleDate(end)}&details=${encodeURIComponent(
+    `Vehicle: ${appointment.vehicle}\nTime: ${label}\nAdvisor: ${appointment.advisor_name || appointment.advisor}`
+  )}&location=${encodeURIComponent(location)}`;
 }
 
-function formatDayLabel(dateText?: string) {
-  if (!dateText) {
-    return null;
-  }
-
-  const date = new Date(dateText);
-
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Chicago",
-    weekday: "long",
-    month: "long",
-    day: "numeric"
-  }).format(date);
-}
-
-function SafeImage({
-  src,
-  alt,
-  className,
-  fallbackClassName,
-  fallbackLabel
-}: {
-  src?: string;
-  alt: string;
-  className: string;
-  fallbackClassName: string;
-  fallbackLabel: string;
-}) {
+function SafeImage({ src, alt, className, fallback }: { src?: string; alt: string; className: string; fallback?: ReactNode }) {
   const [failed, setFailed] = useState(!src);
-
-  if (!src || failed) {
-    return <div className={fallbackClassName}>{fallbackLabel}</div>;
-  }
-
+  if (!src || failed) return fallback ?? null;
   return <img src={src} alt={alt} className={className} onError={() => setFailed(true)} />;
+}
+
+function CarouselImage({ src, alt, onClick }: { src: string; alt: string; onClick: () => void }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return null;
+  return (
+    <button type="button" onClick={onClick} className="h-24 min-w-32 overflow-hidden rounded-[18px] border border-[#e4d9ca] bg-white shadow-sm">
+      <img src={src} alt={alt} className="h-full w-full object-cover" onError={() => setFailed(true)} />
+    </button>
+  );
 }
 
 export function AppointmentPage({ appointment }: Props) {
   const [confirmed, setConfirmed] = useState(Boolean(appointment.confirmed));
   const [toast, setToast] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeSupportAction, setActiveSupportAction] = useState<string | null>(null);
-  const [activeGallery, setActiveGallery] = useState<{ images: string[]; index: number } | null>(null);
-  const [showMoreReviews, setShowMoreReviews] = useState(false);
-  const [expandedExpectation, setExpandedExpectation] = useState<string | null>(null);
-  const [expandedBringItem, setExpandedBringItem] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [supportBusy, setSupportBusy] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
+  const [gallery, setGallery] = useState<{ images: string[]; index: number } | null>(null);
+  const [moreReviewsOpen, setMoreReviewsOpen] = useState(false);
+  const [expandedBring, setExpandedBring] = useState<string | null>(null);
+  const [expandedVisit, setExpandedVisit] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<SectionId>("top");
+  const [navCondensed, setNavCondensed] = useState(false);
   const [bankName, setBankName] = useState(appointment.payoff_lender_name || "");
   const [payoffPhotos, setPayoffPhotos] = useState(appointment.payoff_photo_urls ?? []);
-  const [payoffUploading, setPayoffUploading] = useState(false);
+  const [payoffBusy, setPayoffBusy] = useState(false);
+  const lastY = useRef(0);
 
   const advisorName = appointment.advisor_name || appointment.advisor || "Jude";
-  const advisorFirstName = advisorName.trim().split(/\s+/)[0] || advisorName;
+  const advisorFirstName = firstName(advisorName);
+  const customerFirstName = firstName(appointment.name);
   const timeLabel = appointment.appointment_at ? formatAppointmentDate(appointment.appointment_at) : appointment.time;
   const shortTime = formatShortTime(appointment.appointment_at) || appointment.time || timeLabel;
-  const dayTime = formatDayTime(appointment.appointment_at);
-  const dayLabel = formatDayLabel(appointment.appointment_at);
   const entrancePhotos = appointment.entrance_photo_urls ?? [];
   const reviews = appointment.featured_reviews ?? [];
-  const featuredReviews = reviews.slice(0, 3);
-  const extraReviews = reviews.slice(3);
-  const trustImages = [
-    ...(appointment.review_photo_urls ?? []),
-    ...(appointment.customer_delivery_photo_urls ?? []),
-    ...(appointment.check_handoff_photo_urls ?? [])
-  ];
-  const calendarLink = useMemo(() => createGoogleCalendarLink(appointment, timeLabel), [appointment, timeLabel]);
-  const reminderFile = useMemo(() => createReminderFile(appointment, timeLabel), [appointment, timeLabel]);
-  const contactPhone = appointment.advisor_phone;
-  const mapsLink =
-    appointment.google_maps_url ||
-    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-      appointment.location_address || DEFAULT_LOCATION_ADDRESS
-    )}`;
+  const featuredReviews = reviews.slice(0, 2);
+  const extraReviews = reviews.slice(2);
+  const trustImages = [...(appointment.review_photo_urls ?? []), ...(appointment.customer_delivery_photo_urls ?? []), ...(appointment.check_handoff_photo_urls ?? [])].slice(0, 4);
+  const calLink = useMemo(() => calendarLink(appointment, timeLabel), [appointment, timeLabel]);
+  const phone = appointment.advisor_phone;
+  const mapsLink = appointment.google_maps_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(appointment.location_address || DEFAULT_LOCATION_ADDRESS)}`;
+  const hasReviews = featuredReviews.length > 0 || Boolean(appointment.google_reviews_url) || trustImages.length > 0;
+  const navItems = [
+    ["top", "Top"],
+    ["arrival", "Arrival"],
+    ["visit", "Visit"],
+    ["bring", "Bring"],
+    ...(hasReviews ? [["reviews", "Reviews"]] : []),
+    ["help", "Help"]
+  ] as Array<[SectionId, string]>;
 
   useEffect(() => {
     const controller = new AbortController();
-
     fetch(`/api/appointments/${appointment.id}/event`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type: "page_opened" }),
       signal: controller.signal
     }).catch(() => null);
-
     return () => controller.abort();
   }, [appointment.id]);
 
-  async function handleConfirm() {
-    setIsSubmitting(true);
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (visible?.target.id) setActiveSection(visible.target.id as SectionId);
+      },
+      { rootMargin: "-24% 0px -58% 0px", threshold: [0.08, 0.25, 0.45] }
+    );
+    (["top", "arrival", "visit", "bring", "reviews", "help"] as SectionId[])
+      .map((id) => document.getElementById(id))
+      .filter(Boolean)
+      .forEach((element) => observer.observe(element as Element));
+    return () => observer.disconnect();
+  }, [hasReviews]);
 
+  useEffect(() => {
+    function onScroll() {
+      const next = window.scrollY;
+      setNavCondensed(next > lastY.current && next > 180);
+      lastY.current = next;
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  async function confirmAppointment() {
+    setBusy(true);
     try {
       const response = await fetch(`/api/appointments/${appointment.id}/event`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "confirm_clicked" })
       });
-
-      if (!response.ok) {
-        throw new Error("Unable to confirm");
-      }
-
+      if (!response.ok) throw new Error("Unable to confirm");
       setConfirmed(true);
-      setToast(`Perfect - I'll be ready for you at ${shortTime}.`);
+      setToast(`Confirmed for ${shortTime}.`);
     } catch {
-      setToast("Your time is still set aside. If needed, just reply back and we will take care of it.");
+      setToast("If anything changes, use the update options below and we will adjust.");
     } finally {
-      setIsSubmitting(false);
+      setBusy(false);
     }
   }
 
-  async function handleSupportAction({
-    type,
-    message,
-    toastMessage
-  }: {
-    type: "running_late_clicked" | "reschedule_requested_clicked" | "cant_make_it_clicked";
-    message: string;
-    toastMessage: string;
-  }) {
-    setActiveSupportAction(type);
-
+  async function support(type: "running_late_clicked" | "reschedule_requested_clicked" | "cant_make_it_clicked", message: string) {
+    setSupportBusy(true);
     try {
       await fetch(`/api/appointments/${appointment.id}/event`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type })
       });
-    } catch {
-      // Keep the outbound message path available even if event logging fails.
     } finally {
-      setActiveSupportAction(null);
+      setSupportBusy(false);
     }
-
-    setToast(toastMessage);
-
-    if (contactPhone) {
-      window.location.href = `sms:${contactPhone}?body=${encodeURIComponent(message)}`;
-    }
+    setToast("A quick update is ready.");
+    if (phone) window.location.href = `sms:${phone}?body=${encodeURIComponent(message)}`;
   }
 
-  function handleDownloadReminder() {
-    if (!reminderFile) {
-      setToast("A scheduled appointment time is required before a reminder can be added.");
-      return;
-    }
-
-    const blob = new Blob([reminderFile.content], { type: "text/calendar;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = reminderFile.filename;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
-    setToast("Reminder file downloaded. Open it to add the appointment to your reminders or calendar.");
-  }
-
-  async function savePayoffInfo(files?: FileList | null) {
+  async function savePayoff(files?: FileList | null) {
     if (!files?.length && !bankName.trim()) {
       setToast("Add the bank name or choose a payoff screenshot first.");
       return;
     }
-
-    setPayoffUploading(true);
-
+    setPayoffBusy(true);
     try {
       const formData = new FormData();
       formData.append("bankName", bankName.trim());
-
-      Array.from(files || []).forEach((file) => {
-        formData.append("files", file);
-      });
-
-      const response = await fetch(`/api/appointments/${appointment.id}/payoff`, {
-        method: "POST",
-        body: formData
-      });
-
-      const payload = (await response.json()) as {
-        appointment?: { payoff_photo_urls?: string[]; payoff_lender_name?: string };
-        error?: string;
-      };
-
-      if (!response.ok) {
-        throw new Error(payload.error || "Unable to save payoff information.");
-      }
-
+      Array.from(files || []).forEach((file) => formData.append("files", file));
+      const response = await fetch(`/api/appointments/${appointment.id}/payoff`, { method: "POST", body: formData });
+      const payload = (await response.json()) as { appointment?: { payoff_photo_urls?: string[]; payoff_lender_name?: string }; error?: string };
+      if (!response.ok) throw new Error(payload.error || "Unable to save payoff information.");
       setBankName(payload.appointment?.payoff_lender_name || bankName.trim());
       setPayoffPhotos(payload.appointment?.payoff_photo_urls || []);
-      setToast("Payoff information saved. We will have it ready before your appointment.");
+      setToast("Payoff information saved.");
     } catch (error) {
       setToast(error instanceof Error ? error.message : "Unable to save payoff information.");
     } finally {
-      setPayoffUploading(false);
+      setPayoffBusy(false);
     }
   }
 
-  async function handlePayoffUpload(event: ChangeEvent<HTMLInputElement>) {
-    await savePayoffInfo(event.target.files);
+  async function uploadPayoff(event: ChangeEvent<HTMLInputElement>) {
+    await savePayoff(event.target.files);
     event.target.value = "";
   }
 
   return (
-    <main className={`${bodyFont.className} min-h-screen bg-transparent px-4 py-5 text-[#1a1a1a] sm:px-6 sm:py-8`}>
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-        <section className="relative overflow-hidden rounded-[2rem] border border-[#e4d8ca] bg-[linear-gradient(135deg,#f7f1e7_0%,#f1e8da_55%,#eadfce_100%)] p-6 shadow-[0_30px_80px_rgba(48,36,25,0.14)] sm:p-8">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(186,135,77,0.22),transparent_30%),radial-gradient(circle_at_88%_18%,rgba(31,73,60,0.18),transparent_24%)]" />
-          <div className="relative grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-            <div className="space-y-5">
-              <div className="inline-flex items-center gap-3 rounded-full border border-white/50 bg-white/60 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-[#826548] backdrop-blur">
-                <span className="h-2 w-2 rounded-full bg-[#20483a]" />
-                Appointment Reserved
-              </div>
+    <main className={`${bodyFont.className} min-h-screen bg-[linear-gradient(180deg,#f8f3ea_0%,#f2eadf_48%,#ebe1d3_100%)] px-4 pb-32 pt-5 text-[#1c1915] sm:px-6 sm:pt-8`}>
+      <div className="mx-auto flex w-full max-w-[640px] flex-col gap-6">
+        <section id="top" className="scroll-mt-6 rounded-[28px] border border-[#e1d5c6] bg-white/72 p-6 shadow-[0_22px_55px_rgba(45,35,24,0.09)] backdrop-blur">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#826548]">Appointment Set</p>
+          <h1 className={`${displayFont.className} mt-3 text-4xl leading-[0.95] tracking-[-0.045em] text-[#171512] sm:text-5xl`}>{customerFirstName} - you&apos;re all set for {shortTime}</h1>
+          <p className="mt-4 text-base leading-7 text-[#5c5248]">Selling your {appointment.vehicle}</p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            {calLink ? <ActionLink href={calLink} label="Add to Calendar" external /> : null}
+            <ActionLink href={mapsLink} label="Get Directions" external />
+            {phone ? <button type="button" onClick={() => setContactOpen(true)} className="rounded-full border border-[#d8cdbc] bg-[#fbf8f2] px-4 py-3 text-sm font-semibold text-[#25211d]">Contact</button> : null}
+          </div>
+        </section>
 
-              <div className="space-y-3">
-                <h1 className={`${displayFont.className} max-w-3xl text-4xl leading-[0.94] tracking-[-0.05em] text-[#171512] sm:text-5xl md:text-6xl`}>
-                  {appointment.name}, {advisorFirstName} will be ready for you at {shortTime}.
-                </h1>
-                <p className="max-w-2xl text-[17px] leading-8 text-[#4f463d]">
-                  {appointment.name}, your appointment to sell the {appointment.vehicle} is already set aside.
-                  We&apos;ll keep the visit clear, quick, and professional from the moment you arrive.
-                </p>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-[1.25rem] border border-white/45 bg-white/55 p-4 backdrop-blur">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#86694b]">Appointment</p>
-                  <p className="mt-2 text-sm leading-6 text-[#29251f]">{dayLabel || dayTime || timeLabel}</p>
-                  {dayLabel ? <p className="text-xs text-[#776a5e]">{shortTime}</p> : null}
-                </div>
-                <div className="rounded-[1.25rem] border border-white/45 bg-white/55 p-4 backdrop-blur">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#86694b]">Vehicle</p>
-                  <p className="mt-2 text-sm leading-6 text-[#29251f]">{appointment.vehicle}</p>
-                </div>
-                <div className="rounded-[1.25rem] border border-white/45 bg-white/55 p-4 backdrop-blur">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#86694b]">Location</p>
-                  <p className="mt-2 text-sm leading-6 text-[#29251f]">
-                    {appointment.location_name || DEFAULT_LOCATION_NAME}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                <button
-                  type="button"
-                  onClick={handleConfirm}
-                  disabled={confirmed || isSubmitting}
-                  className={`min-h-14 rounded-full px-6 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(23,61,51,0.24)] transition hover:translate-y-[-1px] active:scale-[0.99] ${
-                    confirmed ? "bg-[#496c5c]" : "bg-[#173d33] hover:bg-[#113328]"
-                  }`}
-                >
-                  {confirmed ? "Confirmed. We will be ready for you." : `Confirm appointment for ${shortTime}`}
-                </button>
-                {calendarLink ? (
-                  <a
-                    href={calendarLink}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex min-h-14 items-center justify-center rounded-full border border-[#d8c8b3] bg-white/72 px-5 text-sm font-semibold text-[#25231e] transition hover:bg-white"
-                  >
-                    Add to Calendar
-                  </a>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={handleDownloadReminder}
-                  className="inline-flex min-h-14 items-center justify-center rounded-full border border-[#d8c8b3] bg-white/72 px-5 text-sm font-semibold text-[#25231e] transition hover:bg-white"
-                >
-                  Add Reminder
-                </button>
-                <a
-                  href={mapsLink}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex min-h-14 items-center justify-center rounded-full border border-[#d8c8b3] bg-white/72 px-5 text-sm font-semibold text-[#25231e] transition hover:bg-white"
-                >
-                  Get Directions
-                </a>
-              </div>
-
-              <div className="flex flex-wrap gap-2 text-[11px] font-medium uppercase tracking-[0.16em] text-[#756858]">
-                <span className="rounded-full border border-white/40 bg-white/45 px-3 py-2 backdrop-blur">
-                  {appointment.name}&apos;s time already reserved
-                </span>
-                <span className="rounded-full border border-white/40 bg-white/45 px-3 py-2 backdrop-blur">
-                  Arrival steps below
-                </span>
-                <span className="rounded-full border border-white/40 bg-white/45 px-3 py-2 backdrop-blur">
-                  Direct contact built in
-                </span>
-              </div>
-
-              {toast ? (
-                <motion.p
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="rounded-[1.25rem] border border-[#cfe1d6] bg-[#eef6f1] px-4 py-3 text-sm leading-7 text-[#234638]"
-                >
-                  {toast}
-                </motion.p>
-              ) : null}
-            </div>
-
-            <div className="rounded-[1.8rem] border border-white/40 bg-[#16382d] p-5 text-white shadow-[0_20px_55px_rgba(14,31,25,0.24)] sm:p-6">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/50">Your advisor</p>
-              <div className="mt-4 flex items-center gap-4">
-                <SafeImage
-                  src={appointment.advisor_photo_url}
-                  alt={advisorName}
-                  className="h-16 w-16 rounded-[1.15rem] object-cover ring-2 ring-white/15"
-                  fallbackClassName="flex h-16 w-16 items-center justify-center rounded-[1.15rem] bg-white/10 text-2xl font-semibold text-white"
-                  fallbackLabel={advisorName.slice(0, 1)}
-                />
-                <div>
-                  <p className="text-2xl font-semibold">{advisorName}</p>
-                  <p className="mt-1 text-sm leading-7 text-white/72">
-                    I&apos;ll already have {appointment.name}&apos;s visit lined up when you get here.
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-6 space-y-3">
-                <div className="rounded-[1.2rem] border border-white/10 bg-white/5 px-4 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">Address</p>
-                  <p className="mt-1 text-sm leading-6 text-white/82">
-                    {appointment.location_address || DEFAULT_LOCATION_ADDRESS}
-                  </p>
-                </div>
-                <div className="rounded-[1.2rem] border border-white/10 bg-white/5 px-4 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">Visit flow</p>
-                  <p className="mt-1 text-sm leading-6 text-white/82">
-                    Arrive, review the vehicle, go over the numbers, and get the offer.
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                {contactPhone ? (
-                  <a
-                    href={`sms:${contactPhone}`}
-                    className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/12 bg-white/8 px-4 text-sm font-semibold text-white transition hover:bg-white/14"
-                  >
-                    Text {advisorName}
-                  </a>
-                ) : null}
-                {contactPhone ? (
-                  <a
-                    href={`tel:${contactPhone}`}
-                    className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/12 bg-white/8 px-4 text-sm font-semibold text-white transition hover:bg-white/14"
-                  >
-                    Call {advisorName}
-                  </a>
-                ) : null}
-              </div>
+        <section className="rounded-[28px] bg-[#173d33] p-5 text-white shadow-[0_24px_60px_rgba(18,44,36,0.22)]">
+          <div className="flex items-center gap-4">
+            <SafeImage src={appointment.advisor_photo_url} alt={advisorName} className="h-16 w-16 rounded-[20px] object-cover ring-2 ring-white/15" fallback={<div className="flex h-16 w-16 items-center justify-center rounded-[20px] bg-white/10 text-2xl font-semibold">{advisorName.slice(0, 1)}</div>} />
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/45">Your advisor</p>
+              <h2 className="mt-1 text-2xl font-semibold">{advisorName}</h2>
+              <p className="mt-1 text-sm leading-6 text-white/72">I&apos;ll have everything ready when you get here.</p>
             </div>
           </div>
+          <button type="button" onClick={confirmAppointment} disabled={confirmed || busy} className={`mt-5 w-full rounded-full px-5 py-4 text-sm font-semibold transition active:scale-[0.99] ${confirmed ? "bg-[#dce9e1] text-[#1f4538]" : "bg-white text-[#173d33] hover:bg-[#f2ece2]"}`}>{confirmed ? "Confirmed" : `I'll be there at ${shortTime}`}</button>
+          {toast ? <p className="mt-3 rounded-[18px] bg-white/8 px-4 py-3 text-sm leading-6 text-white/78">{toast}</p> : null}
         </section>
 
-        <section className="rounded-[1.75rem] border border-[#e3d7c8] bg-white/78 p-6 shadow-[0_18px_42px_rgba(45,35,24,0.07)]">
-          <p className="text-[17px] leading-8 text-[#2e2924]">
-            {appointment.name}, you&apos;re coming in for your {appointment.vehicle}.
-          </p>
-          {dayTime ? <p className="text-[15px] text-[#6a6158]">{dayTime}</p> : null}
+        <section id="arrival" className="scroll-mt-6 space-y-4 rounded-[28px] border border-[#e1d5c6] bg-white/72 p-6 shadow-[0_18px_45px_rgba(45,35,24,0.07)]">
+          <SectionTitle title="When you arrive" />
+          <ol className="space-y-3">{["Pull into the front lot", "Park near the buying center entrance", `Come inside and ask for ${advisorFirstName}`].map((step, index) => <li key={step} className="flex items-center gap-3 text-[15px] text-[#332d27]"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#173d33] text-sm font-semibold text-white">{index + 1}</span>{step}</li>)}</ol>
+          {entrancePhotos.length > 0 ? <ImageBlock image={entrancePhotos[0]} caption="This is where you'll come in" onClick={() => setGallery({ images: entrancePhotos, index: 0 })} /> : null}
+          <ActionLink href={mapsLink} label="Get Directions" external />
         </section>
 
-        <section className="rounded-[1.75rem] border border-[#e3d7c8] bg-white/78 p-6 shadow-[0_18px_42px_rgba(45,35,24,0.07)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8a6f50]">Arrival</p>
-          <h2 className={`${displayFont.className} mt-2 text-3xl tracking-[-0.03em] text-[#171512]`}>When you arrive</h2>
-          <p className="mt-3 text-sm leading-7 text-[#61564b]">
-            Everything below is meant to remove uncertainty before you get here, {appointment.name}.
-          </p>
-          <div className="space-y-3">
-            {arrivalSteps.map((step, index) => (
-              <div
-                key={step}
-                className="mt-5 flex gap-4 rounded-[1.35rem] border border-[#ece4d8] bg-[#fffdfa] px-5 py-4 shadow-[0_10px_24px_rgba(26,26,26,0.04)]"
-              >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#173d33] text-sm font-semibold text-white">
-                  {index + 1}
-                </div>
-                <div>
-                  <p className="text-[15px] font-semibold leading-7 text-[#2e2924]">
-                    {index === 2 ? `Come inside and ask for ${advisorFirstName}` : step}
-                  </p>
-                  <p className="text-sm leading-6 text-[#6a6158]">
-                    {index === 0
-                      ? "Your appointment is already reserved, so just head straight in."
-                      : index === 1
-                        ? "Use the main buying center entrance so we can get started quickly."
-                        : "We will take it from there and keep the visit moving."}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {entrancePhotos.length > 0 ? (
-            <div className="mt-5 space-y-3">
-              <button
-                type="button"
-                onClick={() => setActiveGallery({ images: entrancePhotos, index: 0 })}
-                className="block w-full overflow-hidden rounded-[1.5rem] border border-[#eadfce] text-left shadow-[0_10px_28px_rgba(26,26,26,0.06)] transition hover:scale-[1.01] active:scale-[0.995]"
-              >
-                <SafeImage
-                  src={entrancePhotos[0]}
-                  alt="Building entrance"
-                  className="aspect-[16/10] w-full object-cover"
-                  fallbackClassName="flex aspect-[16/10] w-full items-center justify-center bg-[#efe6d9] text-sm font-medium text-[#6c6258]"
-                  fallbackLabel="Entrance photo unavailable"
-                />
-              </button>
-              <p className="text-sm text-[#6d6258]">This is where you&apos;ll come in</p>
-            </div>
-          ) : null}
-
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-            <a
-              href={mapsLink}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-full border border-[#ddd3c8] bg-white px-4 py-3 text-center text-sm font-semibold text-[#2b2722] transition hover:bg-[#f2ede6] active:scale-[0.98]"
-            >
-              Get Directions
-            </a>
-            {entrancePhotos.length > 0 ? (
-              <button
-                type="button"
-                onClick={() => setActiveGallery({ images: entrancePhotos, index: 0 })}
-                className="rounded-full border border-[#ddd3c8] bg-white px-4 py-3 text-sm font-semibold text-[#2b2722] transition hover:bg-[#f2ede6] active:scale-[0.98]"
-              >
-                View Entrance Photo
-              </button>
-            ) : null}
-          </div>
+        <section id="visit" className="scroll-mt-6 rounded-[28px] border border-[#e1d5c6] bg-white/72 p-6 shadow-[0_18px_45px_rgba(45,35,24,0.07)]">
+          <SectionTitle title="What to expect" />
+          <p className="mt-2 text-sm leading-7 text-[#62584f]">Most visits take about 30-45 minutes.</p>
+          <div className="mt-5 space-y-3">{visitSteps.map(([label, time, detail]) => <CompactDisclosure key={label} label={label} side={time} detail={detail} active={expandedVisit === label} onClick={() => setExpandedVisit((current) => current === label ? null : label)} />)}</div>
         </section>
 
-        <section className="rounded-[1.75rem] border border-[#e3d7c8] bg-white/78 p-6 shadow-[0_18px_42px_rgba(45,35,24,0.07)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8a6f50]">Visit</p>
-          <h2 className={`${displayFont.className} mt-2 text-3xl tracking-[-0.03em] text-[#171512]`}>What to expect</h2>
-          <p className="mt-3 text-[16px] leading-8 text-[#4d463f]">This usually takes about 30 to 45 minutes.</p>
-          <p className="mt-2 text-sm leading-7 text-[#6b6258]">
-            {appointment.name}, the goal is to keep your visit straightforward and worth the drive.
-          </p>
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            {expectationSteps.map((step) => (
-              <button
-                key={step.label}
-                type="button"
-                onClick={() =>
-                  setExpandedExpectation((current) => (current === step.label ? null : step.label))
-                }
-                className="rounded-[1.35rem] border border-[#ece4d8] bg-[#fffdfa] px-4 py-4 text-left shadow-[0_8px_24px_rgba(26,26,26,0.04)] transition hover:bg-[#fcfaf7] active:scale-[0.99]"
-              >
-                <p className="text-sm font-semibold text-[#171512]">{step.label}</p>
-                <p className="mt-1 text-sm text-[#6b6258]">{step.time}</p>
-                <AnimatePresence initial={false}>
-                  {expandedExpectation === step.label ? (
-                    <motion.p
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="mt-3 overflow-hidden text-sm leading-6 text-[#60574e]"
-                    >
-                      {step.detail}
-                    </motion.p>
-                  ) : null}
-                </AnimatePresence>
-              </button>
-            ))}
-          </div>
+        <section id="bring" className="scroll-mt-6 rounded-[28px] border border-[#e1d5c6] bg-white/72 p-6 shadow-[0_18px_45px_rgba(45,35,24,0.07)]">
+          <SectionTitle title="What to bring" />
+          <div className="mt-5 space-y-2">{bringItems.map(([label, detail]) => <BringRow key={label} label={label} detail={detail} expanded={expandedBring === label} onClick={() => setExpandedBring((current) => current === label ? null : label)}>{label === "Payoff info (if applicable)" ? <PayoffBox bankName={bankName} setBankName={setBankName} payoffBusy={payoffBusy} payoffPhotos={payoffPhotos} savePayoff={savePayoff} uploadPayoff={uploadPayoff} openGallery={(index) => setGallery({ images: payoffPhotos, index })} /> : null}</BringRow>)}</div>
         </section>
 
-        <section className="rounded-[1.75rem] border border-[#e3d7c8] bg-white/78 p-6 shadow-[0_18px_42px_rgba(45,35,24,0.07)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8a6f50]">Bring</p>
-          <h2 className={`${displayFont.className} mt-2 text-3xl tracking-[-0.03em] text-[#171512]`}>What to bring</h2>
-          <div className="mt-5 space-y-2">
-            {bringItems.map((item) => (
-              <div
-                key={item.label}
-                className="w-full rounded-[1.2rem] border border-[#ece4d8] bg-[#fffdfa] px-4 py-3"
-              >
-                <button
-                  type="button"
-                  onClick={() =>
-                    setExpandedBringItem((current) => (current === item.label ? null : item.label))
-                  }
-                  className="w-full text-left transition hover:bg-transparent active:scale-[0.99]"
-                >
-                  <p className="text-[16px] leading-8 text-[#2e2924]">{item.label}</p>
-                </button>
-                <AnimatePresence initial={false}>
-                  {expandedBringItem === item.label ? (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="overflow-hidden"
-                    >
-                      <p className="text-sm leading-6 text-[#60574e]">{item.detail}</p>
-                      {item.label === "Payoff info (if applicable)" ? (
-                        <div className="mt-4 rounded-[1.1rem] border border-[#e9dece] bg-[#f8f3ec] p-4">
-                          <p className="text-sm font-semibold text-[#201b16]">10-day payoff</p>
-                          <p className="mt-2 text-sm leading-6 text-[#655b50]">
-                            If you still owe money on the vehicle, add your bank name and a screenshot or photo of the 10-day payoff amount.
-                          </p>
+        {hasReviews ? <section id="reviews" className="scroll-mt-6 rounded-[28px] border border-[#e1d5c6] bg-white/72 p-6 shadow-[0_18px_45px_rgba(45,35,24,0.07)]"><SectionTitle title="What people say" /><div className="mt-5 space-y-4">{featuredReviews.map((item) => <blockquote key={`${item.reviewer_name}-${item.review_text}`} className="rounded-[20px] border border-[#e7ded2] bg-[#fffdf9] p-4"><p className="text-[15px] leading-7 text-[#2e2924]">&ldquo;{item.review_text}&rdquo;</p><footer className="mt-3 text-sm text-[#766a5f]">- {item.reviewer_name}</footer></blockquote>)}</div>{trustImages.length > 0 ? <div className="mt-5 flex gap-3 overflow-x-auto pb-2">{trustImages.map((image, index) => <CarouselImage key={`${image}-${index}`} src={image} alt="Customer visit" onClick={() => setGallery({ images: trustImages, index })} />)}</div> : null}<div className="mt-5 flex flex-wrap gap-3">{appointment.google_reviews_url ? <ActionLink href={appointment.google_reviews_url} label="View Google Reviews" external /> : null}{extraReviews.length > 0 ? <button type="button" onClick={() => setMoreReviewsOpen(true)} className="rounded-full border border-[#d8cdbc] bg-[#fbf8f2] px-4 py-3 text-sm font-semibold text-[#25211d]">More reviews</button> : null}</div></section> : null}
 
-                          <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto]">
-                            <label className="block text-sm font-medium text-[#2d2923]">
-                              Bank or lender name
-                              <input
-                                type="text"
-                                value={bankName}
-                                onChange={(event) => setBankName(event.target.value)}
-                                placeholder="Ally, Capital One, Navy Federal..."
-                                className="mt-2 w-full rounded-[1rem] border border-[#d8cdbc] bg-white px-4 py-3 text-[#1f1a16]"
-                              />
-                            </label>
-                            <label className="block text-sm font-medium text-[#2d2923]">
-                              Upload payoff photo
-                              <input
-                                type="file"
-                                accept="image/*"
-                                multiple
-                                disabled={payoffUploading}
-                                onChange={handlePayoffUpload}
-                                className="mt-2 block w-full rounded-[1rem] border border-[#d8cdbc] bg-white px-4 py-3 text-[#1f1a16]"
-                              />
-                            </label>
-                          </div>
-
-                          <div className="mt-4 flex flex-wrap gap-3">
-                            <button
-                              type="button"
-                              disabled={payoffUploading}
-                              onClick={() => savePayoffInfo(null)}
-                              className="rounded-full border border-[#d9cdbd] bg-white px-4 py-2 text-sm font-semibold text-[#201b16] disabled:opacity-70"
-                            >
-                              {payoffUploading ? "Saving..." : "Save bank name"}
-                            </button>
-                            {bankName ? (
-                              <div className="rounded-full bg-[#ece3d5] px-4 py-2 text-sm text-[#62574b]">
-                                Lender: {bankName}
-                              </div>
-                            ) : null}
-                          </div>
-
-                          {payoffPhotos.length > 0 ? (
-                            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                              {payoffPhotos.map((image, index) => (
-                                <div
-                                  key={`${image}-${index}`}
-                                  className="overflow-hidden rounded-[1rem] border border-[#ded3c6] bg-white"
-                                >
-                                  <SafeImage
-                                    src={image}
-                                    alt="Payoff document"
-                                    className="h-40 w-full object-cover"
-                                    fallbackClassName="flex h-40 w-full items-center justify-center bg-[#efe6d9] text-sm text-[#6c6258]"
-                                    fallbackLabel="Payoff image unavailable"
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </motion.div>
-                  ) : null}
-                </AnimatePresence>
-              </div>
-            ))}
-          </div>
+        <section id="help" className="scroll-mt-6 rounded-[28px] border border-[#e1d5c6] bg-[#f7f2ea] p-6 shadow-[0_18px_45px_rgba(45,35,24,0.06)]">
+          <SectionTitle title="Something come up?" /><p className="mt-2 text-sm leading-7 text-[#62584f]">If plans changed, send a quick update so we can adjust.</p>
+          <div className="mt-5 grid gap-3"><SupportButton label="Reschedule" disabled={supportBusy} onClick={() => support("reschedule_requested_clicked", "Hey, something came up - can we move this to a later time?")} /><SupportButton label="Running Late" disabled={supportBusy} onClick={() => support("running_late_clicked", "Hey, I'm running a few minutes behind but still coming.")} /><SupportButton label="Can't Make It" disabled={supportBusy} onClick={() => support("cant_make_it_clicked", "Hey, I won't be able to make it today. Can we reschedule?")} /></div>
         </section>
 
-        {(featuredReviews.length > 0 || appointment.google_reviews_url || appointment.yelp_reviews_url) ? (
-          <section className="rounded-[1.75rem] border border-[#e3d7c8] bg-white/78 p-6 shadow-[0_18px_42px_rgba(45,35,24,0.07)]">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8a6f50]">Trust</p>
-            <h2 className={`${displayFont.className} mt-2 text-3xl tracking-[-0.03em] text-[#171512]`}>
-              What people say after coming in
-            </h2>
-
-            {featuredReviews.length > 0 ? (
-              <div className="mt-5 grid gap-4 md:grid-cols-3">
-                {featuredReviews.map((item) => (
-                  <blockquote
-                    key={`${item.reviewer_name}-${item.review_text}`}
-                    className="rounded-[1.35rem] border border-[#ece2d3] bg-[#fffdfa] p-5 shadow-[0_8px_24px_rgba(26,26,26,0.04)]"
-                  >
-                    <p className="text-[17px] leading-8 text-[#2e2924]">&ldquo;{item.review_text}&rdquo;</p>
-                    <footer className="mt-4 text-sm text-[#766a5f]">
-                      - {item.reviewer_name}
-                      {item.review_source ? `, ${item.review_source}` : ""}
-                    </footer>
-                  </blockquote>
-                ))}
-              </div>
-            ) : null}
-
-            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              {appointment.google_reviews_url ? (
-                <a
-                  href={appointment.google_reviews_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-full border border-[#ddd3c8] bg-white px-4 py-3 text-center text-sm font-semibold text-[#2b2722] transition hover:bg-[#f2ede6] active:scale-[0.98]"
-                >
-                  View Google Reviews
-                </a>
-              ) : null}
-              {appointment.yelp_reviews_url ? (
-                <a
-                  href={appointment.yelp_reviews_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-full border border-[#ddd3c8] bg-white px-4 py-3 text-center text-sm font-semibold text-[#2b2722] transition hover:bg-[#f2ede6] active:scale-[0.98]"
-                >
-                  View Yelp Reviews
-                </a>
-              ) : null}
-              {extraReviews.length > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => setShowMoreReviews(true)}
-                  className="rounded-full border border-[#ddd3c8] bg-white px-4 py-3 text-sm font-semibold text-[#2b2722] transition hover:bg-[#f2ede6] active:scale-[0.98]"
-                >
-                  See More Feedback
-                </button>
-              ) : null}
-            </div>
-
-            {trustImages.length > 0 ? (
-              <div className="mt-6 flex gap-3 overflow-x-auto pb-2">
-                {trustImages.map((image, index) => (
-                  <button
-                    key={`${image}-${index}`}
-                    type="button"
-                    onClick={() => setActiveGallery({ images: trustImages, index })}
-                    className="h-24 min-w-32 overflow-hidden rounded-[1.15rem] border border-[#ece2d3] shadow-[0_8px_24px_rgba(26,26,26,0.04)]"
-                  >
-                    <SafeImage
-                      src={image}
-                      alt="Customer visit"
-                      className="h-full w-full object-cover"
-                      fallbackClassName="flex h-full w-full items-center justify-center bg-[#efe6d9] px-3 text-center text-xs font-medium text-[#6c6258]"
-                      fallbackLabel="Image unavailable"
-                    />
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </section>
-        ) : null}
-
-        <section className="rounded-[1.65rem] border border-[#e6ddcf] bg-[#f7f3ec] px-6 py-6 text-[#2a2722] shadow-[0_12px_28px_rgba(45,35,24,0.05)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8a6f50]">Support</p>
-          <h2 className={`${displayFont.className} mt-2 text-3xl tracking-[-0.03em] text-[#171512]`}>Something come up?</h2>
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-[#62574b]">
-            If plans changed, send a quick update so we can adjust instead of losing the appointment.
-          </p>
-
-          <div className="mt-5 grid gap-3 md:grid-cols-3">
-            <button
-              type="button"
-              onClick={() =>
-                handleSupportAction({
-                  type: "reschedule_requested_clicked",
-                  message: "Hey, something came up - can we move this to a later time?",
-                  toastMessage: "We opened a reschedule message so you can shift the appointment quickly."
-                })
-              }
-              disabled={activeSupportAction !== null}
-              className="rounded-[1.25rem] border border-[#ddd1c0] bg-white px-4 py-4 text-left transition hover:bg-[#fcf8f3] disabled:opacity-70"
-            >
-              <p className="text-sm font-semibold text-[#211d18]">Reschedule</p>
-              <p className="mt-2 text-sm leading-6 text-[#6b6054]">Ask to move to a later time without losing the visit.</p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                handleSupportAction({
-                  type: "running_late_clicked",
-                  message: "Hey, I'm running a few minutes behind but still coming.",
-                  toastMessage: "We opened a running-late message so the store gets a heads-up."
-                })
-              }
-              disabled={activeSupportAction !== null}
-              className="rounded-[1.25rem] border border-[#ddd1c0] bg-white px-4 py-4 text-left transition hover:bg-[#fcf8f3] disabled:opacity-70"
-            >
-              <p className="text-sm font-semibold text-[#211d18]">Running Late</p>
-              <p className="mt-2 text-sm leading-6 text-[#6b6054]">Let us know you are still coming, just delayed.</p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                handleSupportAction({
-                  type: "cant_make_it_clicked",
-                  message: "Hey, I won't be able to make it today. Can we reschedule?",
-                  toastMessage: "We opened a message so you can reschedule instead of disappearing."
-                })
-              }
-              disabled={activeSupportAction !== null}
-              className="rounded-[1.25rem] border border-[#ddd1c0] bg-white px-4 py-4 text-left transition hover:bg-[#fcf8f3] disabled:opacity-70"
-            >
-              <p className="text-sm font-semibold text-[#211d18]">Can&apos;t Make It</p>
-              <p className="mt-2 text-sm leading-6 text-[#6b6054]">Send a quick note now and recover the appointment.</p>
-            </button>
-          </div>
-        </section>
-
-        <section className="rounded-[1.85rem] border border-[#ddd0bf] bg-[#173d33] px-6 py-7 text-center text-white shadow-[0_24px_55px_rgba(18,44,36,0.28)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/55">Final confirmation</p>
-          <h2 className={`${displayFont.className} mt-3 text-3xl tracking-[-0.03em] text-white sm:text-4xl`}>
-            We have time set aside specifically for you.
-          </h2>
-          <p className="mx-auto mt-3 max-w-2xl text-[17px] leading-8 text-white/74">
-            Confirming now helps us keep {appointment.name}&apos;s appointment moving the moment you arrive.
-          </p>
-          <button
-            type="button"
-            onClick={handleConfirm}
-            disabled={confirmed || isSubmitting}
-            className={`mt-6 w-full rounded-full px-5 py-4 text-base font-semibold transition active:scale-[0.99] ${
-              confirmed ? "bg-[#dce9e1] text-[#1f4538]" : "bg-white text-[#173d33] hover:bg-[#f2ece2]"
-            }`}
-          >
-            {confirmed ? "Confirmed. We will be ready for you." : `Yes, I will be there at ${shortTime}`}
-          </button>
-        </section>
+        <section className="rounded-[28px] bg-[#173d33] px-6 py-7 text-center text-white shadow-[0_24px_55px_rgba(18,44,36,0.24)]"><p className="text-base leading-7 text-white/78">We&apos;ve set aside time specifically for you.</p><button type="button" onClick={confirmAppointment} disabled={confirmed || busy} className={`mt-5 w-full rounded-full px-5 py-4 text-base font-semibold transition active:scale-[0.99] ${confirmed ? "bg-[#dce9e1] text-[#1f4538]" : "bg-white text-[#173d33] hover:bg-[#f2ece2]"}`}>{confirmed ? "Confirmed" : `Yes, I'll be there at ${shortTime}`}</button></section>
       </div>
 
-      <AnimatePresence>
-        {activeGallery ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4"
-            onClick={() => setActiveGallery(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.96, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.98, opacity: 0 }}
-              className="flex max-h-[92vh] w-full max-w-5xl flex-col rounded-[24px] bg-[#f4ede0] p-4 shadow-2xl"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <SafeImage
-                src={activeGallery.images[activeGallery.index]}
-                alt="Appointment reference"
-                className="max-h-[78vh] w-full rounded-[18px] object-contain"
-                fallbackClassName="flex min-h-[280px] w-full items-center justify-center rounded-[18px] bg-[#efe6d9] text-sm font-medium text-[#6c6258]"
-                fallbackLabel="Image unavailable"
-              />
-              {activeGallery.images.length > 1 ? (
-                <div className="mt-4 flex items-center justify-between gap-3">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setActiveGallery((current) =>
-                        current
-                          ? {
-                              ...current,
-                              index: (current.index - 1 + current.images.length) % current.images.length
-                            }
-                          : current
-                      )
-                    }
-                    className="rounded-[16px] border border-[#d8cdbc] bg-white/70 px-4 py-2 text-sm font-medium text-[#2b2722]"
-                  >
-                    Previous
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setActiveGallery((current) =>
-                        current ? { ...current, index: (current.index + 1) % current.images.length } : current
-                      )
-                    }
-                    className="rounded-[16px] border border-[#d8cdbc] bg-white/70 px-4 py-2 text-sm font-medium text-[#2b2722]"
-                  >
-                    Next
-                  </button>
-                </div>
-              ) : null}
-            </motion.div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showMoreReviews ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/45"
-            onClick={() => setShowMoreReviews(false)}
-          >
-            <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 24, stiffness: 220 }}
-              className="absolute inset-x-0 bottom-0 rounded-t-[28px] bg-[#f4ede0] px-5 pb-10 pt-6 shadow-2xl"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="mx-auto max-w-[640px] space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className={`${displayFont.className} text-2xl text-[#171512]`}>More seller feedback</h3>
-                  <button
-                    type="button"
-                    onClick={() => setShowMoreReviews(false)}
-                    className="text-sm font-medium text-[#5a534a]"
-                  >
-                    Close
-                  </button>
-                </div>
-                {extraReviews.map((item) => (
-                  <blockquote key={`${item.reviewer_name}-${item.review_text}`} className="space-y-2">
-                    <p className="text-[16px] leading-8 text-[#2e2924]">&ldquo;{item.review_text}&rdquo;</p>
-                    <footer className="text-sm text-[#766a5f]">
-                      - {item.reviewer_name}
-                      {item.review_source ? `, ${item.review_source}` : ""}
-                    </footer>
-                  </blockquote>
-                ))}
-              </div>
-            </motion.div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+      <SectionNavigator items={navItems} activeSection={activeSection} condensed={navCondensed} onSelect={(id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })} />
+      {contactOpen ? <ContactSheet advisorName={advisorName} phone={phone} onClose={() => setContactOpen(false)} /> : null}
+      {gallery ? <Lightbox images={gallery.images} index={gallery.index} onClose={() => setGallery(null)} onChange={(index) => setGallery((current) => current ? { ...current, index } : current)} /> : null}
+      {moreReviewsOpen ? <ReviewDrawer reviews={extraReviews} onClose={() => setMoreReviewsOpen(false)} /> : null}
     </main>
+  );
+}
+
+function SectionTitle({ title }: { title: string }) {
+  return <h2 className={`${displayFont.className} text-3xl tracking-[-0.035em] text-[#171512]`}>{title}</h2>;
+}
+
+function ActionLink({ href, label, external = false }: { href: string; label: string; external?: boolean }) {
+  return (
+    <a
+      href={href}
+      target={external ? "_blank" : undefined}
+      rel={external ? "noreferrer" : undefined}
+      className="inline-flex rounded-full border border-[#d8cdbc] bg-[#fbf8f2] px-4 py-3 text-sm font-semibold text-[#25211d]"
+    >
+      {label}
+    </a>
+  );
+}
+
+function ImageBlock({ image, caption, onClick }: { image: string; caption: string; onClick: () => void }) {
+  return (
+    <div className="space-y-3">
+      <button type="button" onClick={onClick} className="block w-full overflow-hidden rounded-[22px] border border-[#e3d8c9] bg-[#efe6d9]">
+        <SafeImage src={image} alt={caption} className="aspect-[16/10] w-full object-cover" fallback={<div className="aspect-[16/10] w-full bg-[#efe6d9]" />} />
+      </button>
+      <p className="text-sm text-[#71675d]">{caption}</p>
+    </div>
+  );
+}
+
+function CompactDisclosure({
+  label,
+  side,
+  detail,
+  active,
+  onClick
+}: {
+  label: string;
+  side: string;
+  detail: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button type="button" onClick={onClick} className="w-full rounded-[20px] border border-[#e7ded2] bg-[#fffdf9] px-4 py-4 text-left">
+      <div className="flex items-center justify-between gap-4">
+        <p className="font-semibold text-[#211d18]">{label}</p>
+        <p className="text-sm text-[#71675d]">{side}</p>
+      </div>
+      {active ? <p className="mt-3 text-sm leading-6 text-[#62584f]">{detail}</p> : null}
+    </button>
+  );
+}
+
+function BringRow({
+  label,
+  detail,
+  expanded,
+  onClick,
+  children
+}: {
+  label: string;
+  detail: string;
+  expanded: boolean;
+  onClick: () => void;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="rounded-[20px] border border-[#e7ded2] bg-[#fffdf9] px-4 py-3">
+      <button type="button" onClick={onClick} className="flex w-full items-center justify-between gap-4 text-left">
+        <span className="text-[15px] font-medium text-[#2e2924]">{label}</span>
+        <span className="text-sm text-[#7b7065]">{expanded ? "Close" : "Info"}</span>
+      </button>
+      {expanded ? (
+        <div className="mt-3">
+          <p className="text-sm leading-6 text-[#62584f]">{detail}</p>
+          {children}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function PayoffBox({
+  bankName,
+  setBankName,
+  payoffBusy,
+  payoffPhotos,
+  savePayoff,
+  uploadPayoff,
+  openGallery
+}: {
+  bankName: string;
+  setBankName: (value: string) => void;
+  payoffBusy: boolean;
+  payoffPhotos: string[];
+  savePayoff: (files?: FileList | null) => Promise<void>;
+  uploadPayoff: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
+  openGallery: (index: number) => void;
+}) {
+  return (
+    <div className="mt-4 rounded-[18px] border border-[#e4d9ca] bg-[#f8f3ec] p-4">
+      <p className="text-sm font-semibold text-[#201b16]">10-day payoff</p>
+      <div className="mt-4 grid gap-3">
+        <input
+          type="text"
+          value={bankName}
+          onChange={(event) => setBankName(event.target.value)}
+          placeholder="Bank or lender name"
+          className="w-full rounded-[16px] border border-[#d8cdbc] bg-white px-4 py-3 text-sm text-[#1f1a16]"
+        />
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          disabled={payoffBusy}
+          onChange={uploadPayoff}
+          className="block w-full rounded-[16px] border border-[#d8cdbc] bg-white px-4 py-3 text-sm text-[#1f1a16]"
+        />
+        <button
+          type="button"
+          disabled={payoffBusy}
+          onClick={() => savePayoff(null)}
+          className="w-full rounded-full border border-[#d8cdbc] bg-white px-4 py-3 text-sm font-semibold text-[#1f1a16] disabled:opacity-70"
+        >
+          {payoffBusy ? "Saving..." : "Save payoff info"}
+        </button>
+      </div>
+      {payoffPhotos.length > 0 ? (
+        <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
+          {payoffPhotos.map((image, index) => (
+            <CarouselImage key={`${image}-${index}`} src={image} alt="Payoff document" onClick={() => openGallery(index)} />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function SupportButton({ label, disabled, onClick }: { label: string; disabled: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="rounded-[20px] border border-[#ded4c6] bg-white px-4 py-4 text-left text-sm font-semibold text-[#211d18] transition hover:bg-[#fcf8f3] disabled:opacity-70"
+    >
+      {label}
+    </button>
+  );
+}
+
+function SectionNavigator({
+  items,
+  activeSection,
+  condensed,
+  onSelect
+}: {
+  items: Array<[SectionId, string]>;
+  activeSection: SectionId;
+  condensed: boolean;
+  onSelect: (id: SectionId) => void;
+}) {
+  return (
+    <nav
+      aria-label="Section navigation"
+      className={`fixed inset-x-0 bottom-0 z-40 mx-auto max-w-[680px] px-3 transition-transform duration-300 ${condensed ? "translate-y-2" : "translate-y-0"}`}
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 10px)" }}
+    >
+      <div className="overflow-x-auto rounded-full border border-[#ded4c6] bg-[#fffaf2]/92 p-2 shadow-[0_14px_38px_rgba(37,28,18,0.18)] backdrop-blur">
+        <div className="flex min-w-max gap-2">
+          {items.map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onSelect(id)}
+              className={`rounded-full px-4 py-2 text-xs font-semibold transition ${activeSection === id ? "bg-[#173d33] text-white" : "text-[#5d5348] hover:bg-[#efe6da]"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </nav>
+  );
+}
+
+function ContactSheet({ advisorName, phone, onClose }: { advisorName: string; phone?: string; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end bg-black/45 px-4 pb-4 sm:items-center sm:justify-center" onClick={onClose}>
+      <div className="w-full max-w-sm rounded-[28px] bg-[#f8f3ea] p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <h3 className="text-xl font-semibold text-[#171512]">Contact {advisorName}</h3>
+        <div className="mt-5 grid gap-3">
+          {phone ? (
+            <>
+              <a href={`tel:${phone}`} className="rounded-full bg-[#173d33] px-5 py-4 text-center text-sm font-semibold text-white">Call Advisor</a>
+              <a href={`sms:${phone}`} className="rounded-full border border-[#d8cdbc] bg-white px-5 py-4 text-center text-sm font-semibold text-[#25211d]">Text Advisor</a>
+            </>
+          ) : (
+            <p className="text-sm text-[#62584f]">Contact details are not available for this appointment.</p>
+          )}
+          <button type="button" onClick={onClose} className="rounded-full px-5 py-3 text-sm font-semibold text-[#62584f]">Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Lightbox({
+  images,
+  index,
+  onClose,
+  onChange
+}: {
+  images: string[];
+  index: number;
+  onClose: () => void;
+  onChange: (index: number) => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4" onClick={onClose}>
+      <div className="flex max-h-[92vh] w-full max-w-5xl flex-col rounded-[24px] bg-[#f4ede0] p-4 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <SafeImage
+          src={images[index]}
+          alt="Appointment reference"
+          className="max-h-[78vh] w-full rounded-[18px] object-contain"
+          fallback={<div className="flex min-h-[280px] w-full items-center justify-center rounded-[18px] bg-[#efe6d9] text-sm text-[#6c6258]">Image unavailable</div>}
+        />
+        <div className="mt-4 flex items-center justify-between gap-3">
+          {images.length > 1 ? <button type="button" onClick={() => onChange((index - 1 + images.length) % images.length)} className="rounded-[16px] border border-[#d8cdbc] bg-white/70 px-4 py-2 text-sm font-medium text-[#2b2722]">Previous</button> : <span />}
+          <button type="button" onClick={onClose} className="rounded-[16px] border border-[#d8cdbc] bg-white/70 px-4 py-2 text-sm font-medium text-[#2b2722]">Close</button>
+          {images.length > 1 ? <button type="button" onClick={() => onChange((index + 1) % images.length)} className="rounded-[16px] border border-[#d8cdbc] bg-white/70 px-4 py-2 text-sm font-medium text-[#2b2722]">Next</button> : <span />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReviewDrawer({
+  reviews,
+  onClose
+}: {
+  reviews: Array<{ reviewer_name: string; review_text: string; review_source?: string }>;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/45" onClick={onClose}>
+      <div className="absolute inset-x-0 bottom-0 rounded-t-[28px] bg-[#f4ede0] px-5 pb-10 pt-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="mx-auto max-w-[640px] space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className={`${displayFont.className} text-2xl text-[#171512]`}>More reviews</h3>
+            <button type="button" onClick={onClose} className="text-sm font-medium text-[#5a534a]">Close</button>
+          </div>
+          {reviews.map((item) => (
+            <blockquote key={`${item.reviewer_name}-${item.review_text}`} className="space-y-2">
+              <p className="text-[16px] leading-8 text-[#2e2924]">&ldquo;{item.review_text}&rdquo;</p>
+              <footer className="text-sm text-[#766a5f]">- {item.reviewer_name}</footer>
+            </blockquote>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
