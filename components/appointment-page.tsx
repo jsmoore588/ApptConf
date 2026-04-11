@@ -896,14 +896,14 @@ export function AppointmentPage({ appointment }: Props) {
               initial={{ scale: 0.96, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.98, opacity: 0 }}
-              className="w-full max-w-3xl rounded-[24px] bg-[#f4ede0] p-4 shadow-2xl"
+              className="flex max-h-[92vh] w-full max-w-5xl flex-col rounded-[24px] bg-[#f4ede0] p-4 shadow-2xl"
               onClick={(event) => event.stopPropagation()}
             >
               <SafeImage
                 src={activeGallery.images[activeGallery.index]}
                 alt="Appointment reference"
-                className="aspect-[16/10] w-full rounded-[18px] object-cover"
-                fallbackClassName="flex aspect-[16/10] w-full items-center justify-center rounded-[18px] bg-[#efe6d9] text-sm font-medium text-[#6c6258]"
+                className="max-h-[78vh] w-full rounded-[18px] object-contain"
+                fallbackClassName="flex min-h-[280px] w-full items-center justify-center rounded-[18px] bg-[#efe6d9] text-sm font-medium text-[#6c6258]"
                 fallbackLabel="Image unavailable"
               />
               {activeGallery.images.length > 1 ? (
