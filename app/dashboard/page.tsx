@@ -189,7 +189,10 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 function MiniAppointment({ appointment }: { appointment: DashboardAppointment }) {
   return (
-    <Link href={`/dashboard/appointments/${appointment.id}`} className="block rounded-[1.15rem] border border-white/55 bg-white/50 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
+    <Link
+      href={{ pathname: "/dashboard/appointments/[id]", query: { id: appointment.id } }}
+      className="block rounded-[1.15rem] border border-white/55 bg-white/50 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]"
+    >
       <p className="font-semibold text-[#171410]">{appointment.name}</p>
       <p className="mt-1 text-sm text-[#62584f]">{appointment.formattedTime}</p>
       <p className="mt-1 truncate text-xs text-[#7a7065]">{appointment.vehicle}</p>
@@ -212,7 +215,10 @@ function AppointmentRow({ appointment }: { appointment: DashboardAppointment }) 
       <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <Link href={`/dashboard/appointments/${appointment.id}`} className="text-lg font-semibold text-[#171410] hover:underline">
+            <Link
+              href={{ pathname: "/dashboard/appointments/[id]", query: { id: appointment.id } }}
+              className="text-lg font-semibold text-[#171410] hover:underline"
+            >
               {appointment.name}
             </Link>
             <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase ${statusTone}`}>
