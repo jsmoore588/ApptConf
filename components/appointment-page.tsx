@@ -56,6 +56,45 @@ function calendarLink(appointment: Appointment, label: string) {
   )}&location=${encodeURIComponent(location)}`;
 }
 
+function escapeIcsText(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
+}
+
+function reminderFile(appointment: Appointment, label: string) {
+  if (!appointment.appointment_at) return null;
+  const start = new Date(appointment.appointment_at);
+  const end = new Date(start);
+  end.setHours(end.getHours() + 1);
+  const safeName = (appointment.name || "appointment").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+  const location = appointment.location_address || appointment.location_name || `${DEFAULT_LOCATION_NAME}, ${DEFAULT_LOCATION_ADDRESS}`;
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Appointment Engine//EN",
+    "BEGIN:VEVENT",
+    `UID:${appointment.id}@appointment-engine`,
+    `DTSTAMP:${toGoogleDate(new Date())}`,
+    `DTSTART:${toGoogleDate(start)}`,
+    `DTEND:${toGoogleDate(end)}`,
+    `SUMMARY:Appointment to Sell ${escapeIcsText(appointment.vehicle)}`,
+    `DESCRIPTION:${escapeIcsText(`Vehicle: ${appointment.vehicle}\\nTime: ${label}\\nAdvisor: ${appointment.advisor_name || appointment.advisor || "Advisor"}`)}`,
+    `LOCATION:${escapeIcsText(location)}`,
+    "BEGIN:VALARM",
+    "TRIGGER:-PT2H",
+    "ACTION:DISPLAY",
+    "DESCRIPTION:Appointment reminder",
+    "END:VALARM",
+    "BEGIN:VALARM",
+    "TRIGGER:-PT30M",
+    "ACTION:DISPLAY",
+    "DESCRIPTION:Appointment reminder",
+    "END:VALARM",
+    "END:VEVENT",
+    "END:VCALENDAR"
+  ];
+  return { filename: `${safeName || "appointment"}-reminder.ics`, content: lines.join("\r\n") };
+}
+
 function SafeImage({ src, alt, className, fallback }: { src?: string; alt: string; className: string; fallback?: ReactNode }) {
   const [failed, setFailed] = useState(!src);
   if (!src || failed) return fallback ?? null;
@@ -66,7 +105,7 @@ function CarouselImage({ src, alt, onClick }: { src: string; alt: string; onClic
   const [failed, setFailed] = useState(false);
   if (failed) return null;
   return (
-    <button type="button" onClick={onClick} className="h-24 min-w-32 overflow-hidden rounded-[18px] border border-[#e4d9ca] bg-white shadow-sm">
+    <button type="button" onClick={onClick} className="h-24 min-w-32 overflow-hidden rounded-[18px] border border-white/60 bg-white/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_10px_24px_rgba(45,35,24,0.08)] backdrop-blur-xl">
       <img src={src} alt={alt} className="h-full w-full object-cover" onError={() => setFailed(true)} />
     </button>
   );
@@ -100,14 +139,15 @@ export function AppointmentPage({ appointment }: Props) {
   const extraReviews = reviews.slice(2);
   const trustImages = [...(appointment.review_photo_urls ?? []), ...(appointment.customer_delivery_photo_urls ?? []), ...(appointment.check_handoff_photo_urls ?? [])].slice(0, 4);
   const calLink = useMemo(() => calendarLink(appointment, timeLabel), [appointment, timeLabel]);
+  const reminder = useMemo(() => reminderFile(appointment, timeLabel), [appointment, timeLabel]);
   const phone = appointment.advisor_phone;
   const mapsLink = appointment.google_maps_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(appointment.location_address || DEFAULT_LOCATION_ADDRESS)}`;
   const hasReviews = featuredReviews.length > 0 || Boolean(appointment.google_reviews_url) || trustImages.length > 0;
   const navItems = [
     ["top", "Top"],
     ["arrival", "Arrival"],
-    ["visit", "Visit"],
     ["bring", "Bring"],
+    ["visit", "Visit"],
     ...(hasReviews ? [["reviews", "Reviews"]] : []),
     ["help", "Help"]
   ] as Array<[SectionId, string]>;
@@ -209,21 +249,51 @@ export function AppointmentPage({ appointment }: Props) {
     event.target.value = "";
   }
 
+  function downloadReminder() {
+    if (!reminder) {
+      setToast("A scheduled appointment time is required before a reminder can be added.");
+      return;
+    }
+    const blob = new Blob([reminder.content], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = reminder.filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+    setToast("Reminder downloaded.");
+  }
+
+  function sectionClass(id: SectionId, extra = "") {
+    const active = activeSection === id;
+    return `scroll-mt-6 rounded-[30px] border p-6 shadow-[0_22px_60px_rgba(45,35,24,0.09)] backdrop-blur-2xl transition-all duration-300 ${
+      active
+        ? "border-[#b9c8bc] bg-white/82 ring-2 ring-[#173d33]/18"
+        : "border-white/55 bg-white/58"
+    } ${extra}`;
+  }
+
   return (
-    <main className={`${bodyFont.className} min-h-screen bg-[linear-gradient(180deg,#f8f3ea_0%,#f2eadf_48%,#ebe1d3_100%)] px-4 pb-32 pt-5 text-[#1c1915] sm:px-6 sm:pt-8`}>
+    <main className={`${bodyFont.className} min-h-screen bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.9),transparent_28%),radial-gradient(circle_at_82%_18%,rgba(185,200,188,0.45),transparent_24%),linear-gradient(180deg,#f8f3ea_0%,#f2eadf_48%,#ebe1d3_100%)] px-4 pb-28 pt-5 text-[#1c1915] sm:px-6 sm:pt-8`}>
       <div className="mx-auto flex w-full max-w-[640px] flex-col gap-6">
-        <section id="top" className="scroll-mt-6 rounded-[28px] border border-[#e1d5c6] bg-white/72 p-6 shadow-[0_22px_55px_rgba(45,35,24,0.09)] backdrop-blur">
+        <section id="top" className={sectionClass("top", "relative overflow-hidden")}>
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.62),transparent_42%),radial-gradient(circle_at_top_right,rgba(23,61,51,0.08),transparent_32%)]" />
+          <div className="relative">
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#826548]">Appointment Set</p>
           <h1 className={`${displayFont.className} mt-3 text-4xl leading-[0.95] tracking-[-0.045em] text-[#171512] sm:text-5xl`}>{customerFirstName} - you&apos;re all set for {shortTime}</h1>
           <p className="mt-4 text-base leading-7 text-[#5c5248]">Selling your {appointment.vehicle}</p>
-          <div className="mt-6 flex flex-wrap gap-3">
+          <div className="mt-6 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
             {calLink ? <ActionLink href={calLink} label="Add to Calendar" external /> : null}
+            <button type="button" onClick={downloadReminder} className="rounded-full border border-white/60 bg-white/45 px-4 py-3 text-sm font-semibold text-[#25211d] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_10px_24px_rgba(45,35,24,0.08)] backdrop-blur-xl">Add Reminder</button>
             <ActionLink href={mapsLink} label="Get Directions" external />
-            {phone ? <button type="button" onClick={() => setContactOpen(true)} className="rounded-full border border-[#d8cdbc] bg-[#fbf8f2] px-4 py-3 text-sm font-semibold text-[#25211d]">Contact</button> : null}
+            {phone ? <button type="button" onClick={() => setContactOpen(true)} className="rounded-full border border-white/60 bg-white/45 px-4 py-3 text-sm font-semibold text-[#25211d] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_10px_24px_rgba(45,35,24,0.08)] backdrop-blur-xl">Contact Us</button> : null}
+          </div>
           </div>
         </section>
 
-        <section className="rounded-[28px] bg-[#173d33] p-5 text-white shadow-[0_24px_60px_rgba(18,44,36,0.22)]">
+        <section className="rounded-[30px] border border-white/15 bg-[#173d33]/92 p-5 text-white shadow-[0_24px_60px_rgba(18,44,36,0.22)] backdrop-blur-2xl">
           <div className="flex items-center gap-4">
             <SafeImage src={appointment.advisor_photo_url} alt={advisorName} className="h-16 w-16 rounded-[20px] object-cover ring-2 ring-white/15" fallback={<div className="flex h-16 w-16 items-center justify-center rounded-[20px] bg-white/10 text-2xl font-semibold">{advisorName.slice(0, 1)}</div>} />
             <div>
@@ -236,32 +306,30 @@ export function AppointmentPage({ appointment }: Props) {
           {toast ? <p className="mt-3 rounded-[18px] bg-white/8 px-4 py-3 text-sm leading-6 text-white/78">{toast}</p> : null}
         </section>
 
-        <section id="arrival" className="scroll-mt-6 space-y-4 rounded-[28px] border border-[#e1d5c6] bg-white/72 p-6 shadow-[0_18px_45px_rgba(45,35,24,0.07)]">
+        <section id="arrival" className={sectionClass("arrival", "space-y-4")}>
           <SectionTitle title="When you arrive" />
           <ol className="space-y-3">{["Pull into the front lot", "Park near the buying center entrance", `Come inside and ask for ${advisorFirstName}`].map((step, index) => <li key={step} className="flex items-center gap-3 text-[15px] text-[#332d27]"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#173d33] text-sm font-semibold text-white">{index + 1}</span>{step}</li>)}</ol>
           {entrancePhotos.length > 0 ? <ImageBlock image={entrancePhotos[0]} caption="This is where you'll come in" onClick={() => setGallery({ images: entrancePhotos, index: 0 })} /> : null}
           <ActionLink href={mapsLink} label="Get Directions" external />
         </section>
 
-        <section id="visit" className="scroll-mt-6 rounded-[28px] border border-[#e1d5c6] bg-white/72 p-6 shadow-[0_18px_45px_rgba(45,35,24,0.07)]">
+        <section id="bring" className={sectionClass("bring")}>
+          <SectionTitle title="What to bring" />
+          <div className="mt-5 space-y-2">{bringItems.map(([label, detail]) => <BringRow key={label} label={label} detail={detail} expanded={expandedBring === label} onClick={() => setExpandedBring((current) => current === label ? null : label)}>{label === "Payoff info (if applicable)" ? <PayoffBox bankName={bankName} setBankName={setBankName} payoffBusy={payoffBusy} payoffPhotos={payoffPhotos} savePayoff={savePayoff} uploadPayoff={uploadPayoff} openGallery={(index) => setGallery({ images: payoffPhotos, index })} /> : null}</BringRow>)}</div>
+        </section>
+
+        <section id="visit" className={sectionClass("visit")}>
           <SectionTitle title="What to expect" />
           <p className="mt-2 text-sm leading-7 text-[#62584f]">Most visits take about 30-45 minutes.</p>
           <div className="mt-5 space-y-3">{visitSteps.map(([label, time, detail]) => <CompactDisclosure key={label} label={label} side={time} detail={detail} active={expandedVisit === label} onClick={() => setExpandedVisit((current) => current === label ? null : label)} />)}</div>
         </section>
 
-        <section id="bring" className="scroll-mt-6 rounded-[28px] border border-[#e1d5c6] bg-white/72 p-6 shadow-[0_18px_45px_rgba(45,35,24,0.07)]">
-          <SectionTitle title="What to bring" />
-          <div className="mt-5 space-y-2">{bringItems.map(([label, detail]) => <BringRow key={label} label={label} detail={detail} expanded={expandedBring === label} onClick={() => setExpandedBring((current) => current === label ? null : label)}>{label === "Payoff info (if applicable)" ? <PayoffBox bankName={bankName} setBankName={setBankName} payoffBusy={payoffBusy} payoffPhotos={payoffPhotos} savePayoff={savePayoff} uploadPayoff={uploadPayoff} openGallery={(index) => setGallery({ images: payoffPhotos, index })} /> : null}</BringRow>)}</div>
-        </section>
+        {hasReviews ? <section id="reviews" className={sectionClass("reviews")}><SectionTitle title="What people say" /><div className="mt-5 space-y-4">{featuredReviews.map((item) => <blockquote key={`${item.reviewer_name}-${item.review_text}`} className="rounded-[20px] border border-white/60 bg-white/55 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] backdrop-blur-xl"><p className="text-[15px] leading-7 text-[#2e2924]">&ldquo;{item.review_text}&rdquo;</p><footer className="mt-3 text-sm text-[#766a5f]">- {item.reviewer_name}</footer></blockquote>)}</div>{trustImages.length > 0 ? <div className="mt-5 flex gap-3 overflow-x-auto pb-2">{trustImages.map((image, index) => <CarouselImage key={`${image}-${index}`} src={image} alt="Customer visit" onClick={() => setGallery({ images: trustImages, index })} />)}</div> : null}<div className="mt-5 flex flex-wrap gap-3">{appointment.google_reviews_url ? <ActionLink href={appointment.google_reviews_url} label="View Google Reviews" external /> : null}{extraReviews.length > 0 ? <button type="button" onClick={() => setMoreReviewsOpen(true)} className="rounded-full border border-white/60 bg-white/45 px-4 py-3 text-sm font-semibold text-[#25211d] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_10px_24px_rgba(45,35,24,0.08)] backdrop-blur-xl">More reviews</button> : null}</div></section> : null}
 
-        {hasReviews ? <section id="reviews" className="scroll-mt-6 rounded-[28px] border border-[#e1d5c6] bg-white/72 p-6 shadow-[0_18px_45px_rgba(45,35,24,0.07)]"><SectionTitle title="What people say" /><div className="mt-5 space-y-4">{featuredReviews.map((item) => <blockquote key={`${item.reviewer_name}-${item.review_text}`} className="rounded-[20px] border border-[#e7ded2] bg-[#fffdf9] p-4"><p className="text-[15px] leading-7 text-[#2e2924]">&ldquo;{item.review_text}&rdquo;</p><footer className="mt-3 text-sm text-[#766a5f]">- {item.reviewer_name}</footer></blockquote>)}</div>{trustImages.length > 0 ? <div className="mt-5 flex gap-3 overflow-x-auto pb-2">{trustImages.map((image, index) => <CarouselImage key={`${image}-${index}`} src={image} alt="Customer visit" onClick={() => setGallery({ images: trustImages, index })} />)}</div> : null}<div className="mt-5 flex flex-wrap gap-3">{appointment.google_reviews_url ? <ActionLink href={appointment.google_reviews_url} label="View Google Reviews" external /> : null}{extraReviews.length > 0 ? <button type="button" onClick={() => setMoreReviewsOpen(true)} className="rounded-full border border-[#d8cdbc] bg-[#fbf8f2] px-4 py-3 text-sm font-semibold text-[#25211d]">More reviews</button> : null}</div></section> : null}
-
-        <section id="help" className="scroll-mt-6 rounded-[28px] border border-[#e1d5c6] bg-[#f7f2ea] p-6 shadow-[0_18px_45px_rgba(45,35,24,0.06)]">
+        <section id="help" className={sectionClass("help")}>
           <SectionTitle title="Something come up?" /><p className="mt-2 text-sm leading-7 text-[#62584f]">If plans changed, send a quick update so we can adjust.</p>
           <div className="mt-5 grid gap-3"><SupportButton label="Reschedule" disabled={supportBusy} onClick={() => support("reschedule_requested_clicked", "Hey, something came up - can we move this to a later time?")} /><SupportButton label="Running Late" disabled={supportBusy} onClick={() => support("running_late_clicked", "Hey, I'm running a few minutes behind but still coming.")} /><SupportButton label="Can't Make It" disabled={supportBusy} onClick={() => support("cant_make_it_clicked", "Hey, I won't be able to make it today. Can we reschedule?")} /></div>
         </section>
-
-        <section className="rounded-[28px] bg-[#173d33] px-6 py-7 text-center text-white shadow-[0_24px_55px_rgba(18,44,36,0.24)]"><p className="text-base leading-7 text-white/78">We&apos;ve set aside time specifically for you.</p><button type="button" onClick={confirmAppointment} disabled={confirmed || busy} className={`mt-5 w-full rounded-full px-5 py-4 text-base font-semibold transition active:scale-[0.99] ${confirmed ? "bg-[#dce9e1] text-[#1f4538]" : "bg-white text-[#173d33] hover:bg-[#f2ece2]"}`}>{confirmed ? "Confirmed" : `Yes, I'll be there at ${shortTime}`}</button></section>
       </div>
 
       <SectionNavigator items={navItems} activeSection={activeSection} condensed={navCondensed} onSelect={(id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })} />
@@ -282,7 +350,7 @@ function ActionLink({ href, label, external = false }: { href: string; label: st
       href={href}
       target={external ? "_blank" : undefined}
       rel={external ? "noreferrer" : undefined}
-      className="inline-flex rounded-full border border-[#d8cdbc] bg-[#fbf8f2] px-4 py-3 text-sm font-semibold text-[#25211d]"
+      className="inline-flex justify-center rounded-full border border-white/60 bg-white/45 px-4 py-3 text-sm font-semibold text-[#25211d] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_10px_24px_rgba(45,35,24,0.08)] backdrop-blur-xl"
     >
       {label}
     </a>
@@ -292,7 +360,7 @@ function ActionLink({ href, label, external = false }: { href: string; label: st
 function ImageBlock({ image, caption, onClick }: { image: string; caption: string; onClick: () => void }) {
   return (
     <div className="space-y-3">
-      <button type="button" onClick={onClick} className="block w-full overflow-hidden rounded-[22px] border border-[#e3d8c9] bg-[#efe6d9]">
+    <button type="button" onClick={onClick} className="block w-full overflow-hidden rounded-[22px] border border-white/60 bg-white/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_12px_28px_rgba(45,35,24,0.08)] backdrop-blur-xl">
         <SafeImage src={image} alt={caption} className="aspect-[16/10] w-full object-cover" fallback={<div className="aspect-[16/10] w-full bg-[#efe6d9]" />} />
       </button>
       <p className="text-sm text-[#71675d]">{caption}</p>
@@ -314,7 +382,7 @@ function CompactDisclosure({
   onClick: () => void;
 }) {
   return (
-    <button type="button" onClick={onClick} className="w-full rounded-[20px] border border-[#e7ded2] bg-[#fffdf9] px-4 py-4 text-left">
+    <button type="button" onClick={onClick} className="w-full rounded-[20px] border border-white/60 bg-white/52 px-4 py-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] backdrop-blur-xl">
       <div className="flex items-center justify-between gap-4">
         <p className="font-semibold text-[#211d18]">{label}</p>
         <p className="text-sm text-[#71675d]">{side}</p>
@@ -338,7 +406,7 @@ function BringRow({
   children?: ReactNode;
 }) {
   return (
-    <div className="rounded-[20px] border border-[#e7ded2] bg-[#fffdf9] px-4 py-3">
+    <div className="rounded-[20px] border border-white/60 bg-white/52 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] backdrop-blur-xl">
       <button type="button" onClick={onClick} className="flex w-full items-center justify-between gap-4 text-left">
         <span className="text-[15px] font-medium text-[#2e2924]">{label}</span>
         <span className="text-sm text-[#7b7065]">{expanded ? "Close" : "Info"}</span>
@@ -371,7 +439,7 @@ function PayoffBox({
   openGallery: (index: number) => void;
 }) {
   return (
-    <div className="mt-4 rounded-[18px] border border-[#e4d9ca] bg-[#f8f3ec] p-4">
+    <div className="mt-4 rounded-[18px] border border-white/60 bg-white/45 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] backdrop-blur-xl">
       <p className="text-sm font-semibold text-[#201b16]">10-day payoff</p>
       <div className="mt-4 grid gap-3">
         <input
@@ -415,7 +483,7 @@ function SupportButton({ label, disabled, onClick }: { label: string; disabled: 
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="rounded-[20px] border border-[#ded4c6] bg-white px-4 py-4 text-left text-sm font-semibold text-[#211d18] transition hover:bg-[#fcf8f3] disabled:opacity-70"
+      className="rounded-[20px] border border-white/60 bg-white/50 px-4 py-4 text-left text-sm font-semibold text-[#211d18] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] backdrop-blur-xl transition hover:bg-white/70 disabled:opacity-70"
     >
       {label}
     </button>
@@ -439,14 +507,14 @@ function SectionNavigator({
       className={`fixed inset-x-0 bottom-0 z-40 mx-auto max-w-[680px] px-3 transition-transform duration-300 ${condensed ? "translate-y-2" : "translate-y-0"}`}
       style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 10px)" }}
     >
-      <div className="overflow-x-auto rounded-full border border-[#ded4c6] bg-[#fffaf2]/92 p-2 shadow-[0_14px_38px_rgba(37,28,18,0.18)] backdrop-blur">
-        <div className="flex min-w-max gap-2">
+      <div className="overflow-x-auto rounded-[26px] border border-white/65 bg-[#fffaf2]/76 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75),0_14px_38px_rgba(37,28,18,0.18)] backdrop-blur-2xl">
+        <div className="flex min-w-max justify-between gap-2">
           {items.map(([id, label]) => (
             <button
               key={id}
               type="button"
               onClick={() => onSelect(id)}
-              className={`rounded-full px-4 py-2 text-xs font-semibold transition ${activeSection === id ? "bg-[#173d33] text-white" : "text-[#5d5348] hover:bg-[#efe6da]"}`}
+              className={`rounded-full px-4 py-2.5 text-[13px] font-bold tracking-[0.02em] transition ${activeSection === id ? "bg-[#173d33] text-white shadow-[0_8px_18px_rgba(23,61,51,0.22)]" : "text-[#3f372f] hover:bg-white/62"}`}
             >
               {label}
             </button>

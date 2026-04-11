@@ -216,6 +216,8 @@ function AppointmentSection({
     priority: "high" | "normal" | "low";
     phone?: string;
     advisor_phone?: string;
+    payoff_lender_name?: string;
+    payoff_photo_urls?: string[];
   }>;
   emptyLabel: string;
   compact?: boolean;
@@ -262,6 +264,8 @@ function AppointmentCard({
     priority: "high" | "normal" | "low";
     phone?: string;
     advisor_phone?: string;
+    payoff_lender_name?: string;
+    payoff_photo_urls?: string[];
   };
   compact?: boolean;
 }) {
@@ -302,6 +306,37 @@ function AppointmentCard({
         </div>
         <p className="mt-2 text-sm text-[#322d27]">{appointment.vehicle}</p>
         <p className="mt-1 text-sm text-[#6d6358]">{appointment.formattedTime}</p>
+        {(appointment.payoff_lender_name || (appointment.payoff_photo_urls?.length ?? 0) > 0) ? (
+          <div className="mt-4 rounded-[1.05rem] border border-[#e1d5c6] bg-white/70 p-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a6f50]">
+              Payoff info
+            </p>
+            {appointment.payoff_lender_name ? (
+              <p className="mt-2 text-sm font-medium text-[#2e2924]">
+                Bank: {appointment.payoff_lender_name}
+              </p>
+            ) : null}
+            {(appointment.payoff_photo_urls?.length ?? 0) > 0 ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {appointment.payoff_photo_urls?.map((url, index) => (
+                  <a
+                    key={`${url}-${index}`}
+                    href={url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="overflow-hidden rounded-[0.9rem] border border-[#ddd3c8] bg-[#f8f3ec]"
+                  >
+                    <img
+                      src={url}
+                      alt={`Payoff upload ${index + 1}`}
+                      className="h-16 w-20 object-cover"
+                    />
+                  </a>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2 md:mt-0 md:justify-end">
