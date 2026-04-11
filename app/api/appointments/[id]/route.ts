@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { deleteAppointment, getAppointmentAnalytics } from "@/lib/storage";
+import { deleteAppointment, getAppointmentAnalytics, updateAppointment } from "@/lib/storage";
 import { getCurrentUser } from "@/lib/auth";
 
 export async function GET(
@@ -33,4 +33,25 @@ export async function DELETE(
 
   await deleteAppointment(id);
   return NextResponse.json({ ok: true });
+}
+
+export async function PATCH(
+  request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
+  if (!(await getCurrentUser())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await context.params;
+  const body = (await request.json()) as { notes?: string };
+  const updated = await updateAppointment(id, {
+    notes: body.notes?.trim() || ""
+  });
+
+  if (!updated) {
+    return NextResponse.json({ error: "Appointment not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({ appointment: updated });
 }

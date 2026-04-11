@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAppointmentById, updateAppointment } from "@/lib/storage";
+import { getAppointmentById, registerEvent, updateAppointment } from "@/lib/storage";
 import { uploadAppointmentAsset } from "@/lib/asset-storage";
 
 export async function POST(
@@ -35,6 +35,11 @@ export async function POST(
   const updated = await updateAppointment(id, {
     payoff_lender_name: bankName || appointment.payoff_lender_name,
     payoff_photo_urls: nextUrls
+  });
+
+  await registerEvent(id, "payoff_info_submitted", {
+    bankName: bankName || appointment.payoff_lender_name || "",
+    uploadedPhotos: uploadedUrls.length
   });
 
   return NextResponse.json({

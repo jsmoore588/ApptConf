@@ -62,6 +62,13 @@ export type Appointment = {
 export type AppointmentEventType =
   | "page_opened"
   | "confirm_clicked"
+  | "calendar_clicked"
+  | "reminder_clicked"
+  | "directions_clicked"
+  | "contact_opened"
+  | "google_reviews_clicked"
+  | "more_reviews_clicked"
+  | "payoff_info_submitted"
   | "running_late_clicked"
   | "reschedule_requested_clicked"
   | "cant_make_it_clicked";

@@ -220,6 +220,14 @@ export function AppointmentPage({ appointment }: Props) {
     if (phone) window.location.href = `sms:${phone}?body=${encodeURIComponent(message)}`;
   }
 
+  function logEvent(type: "calendar_clicked" | "reminder_clicked" | "directions_clicked" | "contact_opened" | "google_reviews_clicked" | "more_reviews_clicked") {
+    fetch(`/api/appointments/${appointment.id}/event`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type })
+    }).catch(() => null);
+  }
+
   async function savePayoff(files?: FileList | null) {
     if (!files?.length && !bankName.trim()) {
       setToast("Add the bank name or choose a payoff screenshot first.");
@@ -249,6 +257,7 @@ export function AppointmentPage({ appointment }: Props) {
   }
 
   function downloadReminder() {
+    logEvent("reminder_clicked");
     if (!reminder) {
       setToast("A scheduled appointment time is required before a reminder can be added.");
       return;
@@ -279,10 +288,10 @@ export function AppointmentPage({ appointment }: Props) {
           <h1 className={`${displayFont.className} mt-3 text-4xl leading-[0.95] tracking-[-0.045em] text-[#171512] sm:text-5xl`}>{customerFirstName} - you&apos;re all set for {shortTime}</h1>
           <p className="mt-4 text-base leading-7 text-[#5c5248]">Selling your {appointment.vehicle}</p>
           <div className="mt-6 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
-            {calLink ? <ActionLink href={calLink} label="Add to Calendar" external /> : null}
+            {calLink ? <ActionLink href={calLink} label="Add to Calendar" external onClick={() => logEvent("calendar_clicked")} /> : null}
             <button type="button" onClick={downloadReminder} className="rounded-full border border-white/60 bg-white/45 px-4 py-3 text-sm font-semibold text-[#25211d] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_10px_24px_rgba(45,35,24,0.08)] backdrop-blur-xl">Add Reminder</button>
-            <ActionLink href={mapsLink} label="Get Directions" external />
-            {phone ? <button type="button" onClick={() => setContactOpen(true)} className="rounded-full border border-white/60 bg-white/45 px-4 py-3 text-sm font-semibold text-[#25211d] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_10px_24px_rgba(45,35,24,0.08)] backdrop-blur-xl">Contact Us</button> : null}
+            <ActionLink href={mapsLink} label="Get Directions" external onClick={() => logEvent("directions_clicked")} />
+            {phone ? <button type="button" onClick={() => { logEvent("contact_opened"); setContactOpen(true); }} className="rounded-full border border-white/60 bg-white/45 px-4 py-3 text-sm font-semibold text-[#25211d] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_10px_24px_rgba(45,35,24,0.08)] backdrop-blur-xl">Contact Us</button> : null}
           </div>
           </div>
         </section>
@@ -304,7 +313,7 @@ export function AppointmentPage({ appointment }: Props) {
           <SectionTitle title="When you arrive" />
           <ol className="space-y-3">{["Pull into the front lot", "Park near the buying center entrance", `Come inside and ask for ${advisorFirstName}`].map((step, index) => <li key={step} className="flex items-center gap-3 text-[15px] text-[#332d27]"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#173d33] text-sm font-semibold text-white">{index + 1}</span>{step}</li>)}</ol>
           {entrancePhotos.length > 0 ? <ImageBlock image={entrancePhotos[0]} caption="This is where you'll come in" onClick={() => setGallery({ images: entrancePhotos, index: 0 })} /> : null}
-          <ActionLink href={mapsLink} label="Get Directions" external />
+          <ActionLink href={mapsLink} label="Get Directions" external onClick={() => logEvent("directions_clicked")} />
         </section>
 
         <section id="bring" className={sectionClass("bring")}>
@@ -318,7 +327,7 @@ export function AppointmentPage({ appointment }: Props) {
           <div className="mt-5 space-y-3">{visitSteps.map(([label, time, detail]) => <CompactDisclosure key={label} label={label} side={time} detail={detail} active={expandedVisit === label} onClick={() => setExpandedVisit((current) => current === label ? null : label)} />)}</div>
         </section>
 
-        {hasReviews ? <section id="reviews" className={sectionClass("reviews")}><SectionTitle title="What people say" /><div className="mt-5 space-y-4">{featuredReviews.map((item) => <blockquote key={`${item.reviewer_name}-${item.review_text}`} className="rounded-[20px] border border-white/60 bg-white/55 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] backdrop-blur-xl"><p className="text-[15px] leading-7 text-[#2e2924]">&ldquo;{item.review_text}&rdquo;</p><footer className="mt-3 text-sm text-[#766a5f]">- {item.reviewer_name}</footer></blockquote>)}</div>{trustImages.length > 0 ? <div className="mt-5 flex gap-3 overflow-x-auto pb-2">{trustImages.map((image, index) => <CarouselImage key={`${image}-${index}`} src={image} alt="Customer visit" onClick={() => setGallery({ images: trustImages, index })} />)}</div> : null}<div className="mt-5 flex flex-wrap gap-3">{appointment.google_reviews_url ? <ActionLink href={appointment.google_reviews_url} label="View Google Reviews" external /> : null}{extraReviews.length > 0 ? <button type="button" onClick={() => setMoreReviewsOpen(true)} className="rounded-full border border-white/60 bg-white/45 px-4 py-3 text-sm font-semibold text-[#25211d] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_10px_24px_rgba(45,35,24,0.08)] backdrop-blur-xl">More reviews</button> : null}</div></section> : null}
+        {hasReviews ? <section id="reviews" className={sectionClass("reviews")}><SectionTitle title="What people say" /><div className="mt-5 space-y-4">{featuredReviews.map((item) => <blockquote key={`${item.reviewer_name}-${item.review_text}`} className="rounded-[20px] border border-white/60 bg-white/55 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] backdrop-blur-xl"><p className="text-[15px] leading-7 text-[#2e2924]">&ldquo;{item.review_text}&rdquo;</p><footer className="mt-3 text-sm text-[#766a5f]">- {item.reviewer_name}</footer></blockquote>)}</div>{trustImages.length > 0 ? <div className="mt-5 flex gap-3 overflow-x-auto pb-2">{trustImages.map((image, index) => <CarouselImage key={`${image}-${index}`} src={image} alt="Customer visit" onClick={() => setGallery({ images: trustImages, index })} />)}</div> : null}<div className="mt-5 flex flex-wrap gap-3">{appointment.google_reviews_url ? <ActionLink href={appointment.google_reviews_url} label="View Google Reviews" external onClick={() => logEvent("google_reviews_clicked")} /> : null}{extraReviews.length > 0 ? <button type="button" onClick={() => { logEvent("more_reviews_clicked"); setMoreReviewsOpen(true); }} className="rounded-full border border-white/60 bg-white/45 px-4 py-3 text-sm font-semibold text-[#25211d] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_10px_24px_rgba(45,35,24,0.08)] backdrop-blur-xl">More reviews</button> : null}</div></section> : null}
 
         <section id="help" className={sectionClass("help")}>
           <SectionTitle title="Something come up?" /><p className="mt-2 text-sm leading-7 text-[#62584f]">If plans changed, send a quick update so we can adjust.</p>
@@ -338,12 +347,13 @@ function SectionTitle({ title }: { title: string }) {
   return <h2 className={`${displayFont.className} text-3xl tracking-[-0.035em] text-[#171512]`}>{title}</h2>;
 }
 
-function ActionLink({ href, label, external = false }: { href: string; label: string; external?: boolean }) {
+function ActionLink({ href, label, external = false, onClick }: { href: string; label: string; external?: boolean; onClick?: () => void }) {
   return (
     <a
       href={href}
       target={external ? "_blank" : undefined}
       rel={external ? "noreferrer" : undefined}
+      onClick={onClick}
       className="inline-flex justify-center rounded-full border border-white/60 bg-white/45 px-4 py-3 text-sm font-semibold text-[#25211d] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_10px_24px_rgba(45,35,24,0.08)] backdrop-blur-xl"
     >
       {label}

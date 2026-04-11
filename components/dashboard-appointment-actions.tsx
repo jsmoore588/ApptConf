@@ -5,11 +5,9 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export function DashboardAppointmentActions({
-  appointmentId,
-  phone
+  appointmentId
 }: {
   appointmentId: string;
-  phone?: string;
 }) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
@@ -42,33 +40,23 @@ export function DashboardAppointmentActions({
 
   return (
     <div className="mt-4 flex flex-wrap gap-2 md:mt-0 md:justify-end">
-      {phone ? (
-        <>
-          <a
-            href={`sms:${phone}`}
-            className="rounded-full border border-[#ddd3c8] bg-white px-4 py-2 text-sm font-semibold text-[#27231e]"
-          >
-            Text
-          </a>
-          <a
-            href={`tel:${phone}`}
-            className="rounded-full border border-[#ddd3c8] bg-white px-4 py-2 text-sm font-semibold text-[#27231e]"
-          >
-            Call
-          </a>
-        </>
-      ) : null}
+      <Link
+        href={{ pathname: "/dashboard/appointments/[id]", query: { id: appointmentId } }}
+        className="rounded-full bg-[#173d33] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_12px_26px_rgba(23,61,51,0.2)]"
+      >
+        Open Portfolio
+      </Link>
       <Link
         href={`/appt/${appointmentId}`}
-        className="rounded-full bg-[#173d33] px-4 py-2 text-sm font-semibold text-white"
+        className="rounded-full border border-[#ddd3c8] bg-white/70 px-4 py-2.5 text-sm font-semibold text-[#27231e]"
       >
-        Open page
+        Customer Page
       </Link>
       <button
         type="button"
         onClick={handleDelete}
         disabled={deleting}
-        className="rounded-full border border-[#e2c8c3] bg-[#fff4f2] px-4 py-2 text-sm font-semibold text-[#8b3d34] disabled:opacity-70"
+        className="rounded-full border border-[#e2c8c3] bg-[#fff4f2]/75 px-4 py-2.5 text-sm font-semibold text-[#8b3d34] disabled:opacity-70"
       >
         {deleting ? "Deleting..." : "Delete"}
       </button>

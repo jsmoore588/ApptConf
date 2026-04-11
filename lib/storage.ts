@@ -307,6 +307,7 @@ export async function updateAppointment(id: string, partial: Partial<Appointment
   if (partial.calendar_sync_status !== undefined) payload.calendar_sync_status = partial.calendar_sync_status;
   if (partial.status !== undefined) payload.status = partial.status;
   if (partial.source !== undefined) payload.source = partial.source;
+  if (partial.notes !== undefined) payload.notes = partial.notes;
   if (partial.confirmed !== undefined) payload.confirmed = partial.confirmed;
   if (partial.payoff_lender_name !== undefined) payload.payoff_lender_name = partial.payoff_lender_name;
   if (partial.payoff_photo_urls !== undefined) payload.payoff_photo_urls = partial.payoff_photo_urls;
@@ -446,6 +447,7 @@ export async function getAppointmentAnalytics(appointmentId: string) {
 
   return {
     appointment,
+    events,
     metrics: {
       opens,
       confirmations,

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Manrope } from "next/font/google";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { generateActionSummary } from "@/lib/openai";
@@ -6,6 +7,11 @@ import { getDashboardMetrics } from "@/lib/storage";
 import { listAdvisorUsers } from "@/lib/users";
 import { DashboardAppointmentActions } from "@/components/dashboard-appointment-actions";
 import { DashboardCreateForm } from "@/components/dashboard-create-form";
+
+const dashboardFont = Manrope({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"]
+});
 
 type DashboardAppointment = {
   id: string;
@@ -72,12 +78,12 @@ export default async function DashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_12%_0%,rgba(255,255,255,0.85),transparent_25%),radial-gradient(circle_at_80%_10%,rgba(186,203,191,0.35),transparent_24%),linear-gradient(180deg,#f8f3ea_0%,#eee4d6_58%,#e8ddcd_100%)] px-4 py-5 text-[#171410] sm:px-6 sm:py-8">
+    <main className={`${dashboardFont.className} min-h-screen bg-[radial-gradient(circle_at_12%_0%,rgba(255,255,255,0.85),transparent_25%),radial-gradient(circle_at_80%_10%,rgba(186,203,191,0.35),transparent_24%),linear-gradient(180deg,#f8f3ea_0%,#eee4d6_58%,#e8ddcd_100%)] px-4 py-5 text-[#171410] sm:px-6 sm:py-8`}>
       <div className="mx-auto grid w-full max-w-7xl gap-6 xl:grid-cols-[0.82fr_1.18fr]">
         <aside className="space-y-6 xl:sticky xl:top-6 xl:self-start">
           <section className="overflow-hidden rounded-[2rem] border border-white/18 bg-[#173d33] p-6 text-white shadow-[0_34px_90px_rgba(20,42,35,0.24)]">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/52">Bullard board</p>
-            <h1 className="mt-4 text-4xl font-semibold leading-tight">
+            <h1 className="mt-4 text-4xl font-extrabold leading-tight tracking-[-0.04em]">
               {currentUser.advisor_name || currentUser.display_name}
             </h1>
             <p className="mt-3 text-sm leading-7 text-white/72">
@@ -126,7 +132,7 @@ export default async function DashboardPage() {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8a6f50]">Priority</p>
-                <h2 className="mt-2 text-2xl font-semibold">Needs attention</h2>
+                <h2 className="mt-2 text-2xl font-extrabold tracking-[-0.03em]">Needs attention</h2>
               </div>
               <p className="text-sm text-[#62584f]">{needsAttention.length} appointment{needsAttention.length === 1 ? "" : "s"}</p>
             </div>
@@ -145,7 +151,7 @@ export default async function DashboardPage() {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8a6f50]">Pipeline</p>
-                <h2 className="mt-2 text-2xl font-semibold">All appointments</h2>
+                <h2 className="mt-2 text-2xl font-extrabold tracking-[-0.03em]">All appointments</h2>
               </div>
               <p className="text-sm text-[#62584f]">Showing the next {nextAppointments.length}</p>
             </div>
@@ -162,7 +168,7 @@ export default async function DashboardPage() {
 
           <section className="rounded-[2rem] border border-white/55 bg-white/58 p-6 shadow-[0_22px_60px_rgba(45,35,24,0.09)] backdrop-blur-2xl">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8a6f50]">Readout</p>
-            <h2 className="mt-2 text-2xl font-semibold">What matters now</h2>
+            <h2 className="mt-2 text-2xl font-extrabold tracking-[-0.03em]">What matters now</h2>
             <div className="mt-5 grid gap-3">
               {aiSummary ? <Readout text={aiSummary} /> : null}
               {dashboard.suggestions.length > 0 ? (
@@ -182,7 +188,7 @@ function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-[1.25rem] border border-white/60 bg-white/52 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] backdrop-blur-xl">
       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8a6f50]">{label}</p>
-      <p className="mt-2 text-3xl font-semibold text-[#171410]">{value}</p>
+      <p className="mt-2 text-3xl font-extrabold tracking-[-0.04em] text-[#171410]">{value}</p>
     </div>
   );
 }
@@ -211,32 +217,34 @@ function AppointmentRow({ appointment }: { appointment: DashboardAppointment }) 
           : "bg-[#ece3d5] text-[#6a5135]";
 
   return (
-    <div className="rounded-[1.35rem] border border-white/58 bg-white/52 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.68)] backdrop-blur-xl">
-      <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+    <div className="rounded-[1.35rem] border border-white/58 bg-white/58 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.68),0_14px_34px_rgba(45,35,24,0.055)] backdrop-blur-xl transition hover:bg-white/68">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href={{ pathname: "/dashboard/appointments/[id]", query: { id: appointment.id } }}
-              className="text-lg font-semibold text-[#171410] hover:underline"
+              className="text-xl font-extrabold tracking-[-0.03em] text-[#171410] hover:underline"
             >
               {appointment.name}
             </Link>
-            <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase ${statusTone}`}>
+            <span className={`rounded-full px-3 py-1 text-[0.68rem] font-bold uppercase tracking-[0.08em] ${statusTone}`}>
               {appointment.status.replaceAll("_", " ")}
             </span>
             {appointment.priority === "high" ? (
-              <span className="rounded-full bg-[#8b3d34] px-3 py-1 text-xs font-semibold uppercase text-white">High</span>
+              <span className="rounded-full bg-[#8b3d34] px-3 py-1 text-[0.68rem] font-bold uppercase tracking-[0.08em] text-white">High</span>
             ) : null}
           </div>
-          <p className="mt-2 text-sm text-[#322d27]">{appointment.vehicle}</p>
-          <p className="mt-1 text-sm text-[#6d6358]">{appointment.formattedTime}</p>
+          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-[#5f564c]">
+            <span className="font-semibold text-[#322d27]">{appointment.vehicle}</span>
+            <span>{appointment.formattedTime}</span>
+          </div>
           {(appointment.payoff_lender_name || (appointment.payoff_photo_urls?.length ?? 0) > 0) ? (
             <div className="mt-3 inline-flex rounded-full border border-[#d8cdbc] bg-[#fffaf2]/70 px-3 py-1 text-xs font-semibold text-[#6a5135]">
               Payoff info received
             </div>
           ) : null}
         </div>
-        <DashboardAppointmentActions appointmentId={appointment.id} phone={appointment.advisor_phone || appointment.phone} />
+        <DashboardAppointmentActions appointmentId={appointment.id} />
       </div>
     </div>
   );
