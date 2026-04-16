@@ -43,6 +43,25 @@ function formatShortTime(value?: string) {
   }).format(date);
 }
 
+function toDateInputValue(value?: string) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function toTimeInputValue(value?: string) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
+}
+
 function calendarLink(appointment: Appointment, label: string) {
   if (!appointment.appointment_at) return null;
   const start = new Date(appointment.appointment_at);
@@ -116,6 +135,9 @@ export function AppointmentPage({ appointment }: Props) {
   const [toast, setToast] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [supportBusy, setSupportBusy] = useState(false);
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState(toDateInputValue(appointment.appointment_at));
+  const [rescheduleTime, setRescheduleTime] = useState(toTimeInputValue(appointment.appointment_at));
   const [contactOpen, setContactOpen] = useState(false);
   const [gallery, setGallery] = useState<{ images: string[]; index: number } | null>(null);
   const [moreReviewsOpen, setMoreReviewsOpen] = useState(false);
@@ -218,6 +240,49 @@ export function AppointmentPage({ appointment }: Props) {
     }
     setToast("A quick update is ready.");
     if (phone) window.location.href = `sms:${phone}?body=${encodeURIComponent(message)}`;
+  }
+
+  async function submitReschedule() {
+    if (!rescheduleDate || !rescheduleTime) {
+      setToast("Choose a new date and time first.");
+      return;
+    }
+
+    const requestedAt = new Date(`${rescheduleDate}T${rescheduleTime}`);
+
+    if (Number.isNaN(requestedAt.getTime())) {
+      setToast("That date or time could not be read.");
+      return;
+    }
+
+    setSupportBusy(true);
+
+    try {
+      const response = await fetch(`/api/appointments/${appointment.id}/reschedule`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requested_at: requestedAt.toISOString() })
+      });
+      const payload = (await response.json()) as { requestedLabel?: string; error?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.error || "Unable to send reschedule request.");
+      }
+
+      const requestedLabel = payload.requestedLabel || formatAppointmentDate(requestedAt.toISOString());
+      setToast(`Reschedule request sent for ${requestedLabel}.`);
+      setRescheduleOpen(false);
+      setConfirmed(false);
+
+      if (phone) {
+        const message = `Hey, I need to reschedule. Can we move my appointment to ${requestedLabel}?`;
+        window.location.href = `sms:${phone}?body=${encodeURIComponent(message)}`;
+      }
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Unable to send reschedule request.");
+    } finally {
+      setSupportBusy(false);
+    }
   }
 
   function logEvent(type: "calendar_clicked" | "reminder_clicked" | "directions_clicked" | "contact_opened" | "google_reviews_clicked" | "more_reviews_clicked") {
@@ -331,7 +396,43 @@ export function AppointmentPage({ appointment }: Props) {
 
         <section id="help" className={sectionClass("help")}>
           <SectionTitle title="Something come up?" /><p className="mt-2 text-sm leading-7 text-[#62584f]">If plans changed, send a quick update so we can adjust.</p>
-          <div className="mt-5 grid gap-3"><SupportButton label="Reschedule" disabled={supportBusy} onClick={() => support("reschedule_requested_clicked", "Hey, something came up - can we move this to a later time?")} /><SupportButton label="Running Late" disabled={supportBusy} onClick={() => support("running_late_clicked", "Hey, I'm running a few minutes behind but still coming.")} /><SupportButton label="Can't Make It" disabled={supportBusy} onClick={() => support("cant_make_it_clicked", "Hey, I won't be able to make it today. Can we reschedule?")} /></div>
+          <div className="mt-5 grid gap-3">
+            <SupportButton label="Reschedule" disabled={supportBusy} onClick={() => setRescheduleOpen((current) => !current)} />
+            {rescheduleOpen ? (
+              <div className="rounded-[20px] border border-white/60 bg-white/52 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] backdrop-blur-xl">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="grid gap-2 text-sm font-medium text-[#2e2924]">
+                    New date
+                    <input
+                      type="date"
+                      value={rescheduleDate}
+                      onChange={(event) => setRescheduleDate(event.target.value)}
+                      className="w-full rounded-[14px] border border-[#d8cdbc] bg-white px-4 py-3 text-sm text-[#1f1a16]"
+                    />
+                  </label>
+                  <label className="grid gap-2 text-sm font-medium text-[#2e2924]">
+                    New time
+                    <input
+                      type="time"
+                      value={rescheduleTime}
+                      onChange={(event) => setRescheduleTime(event.target.value)}
+                      className="w-full rounded-[14px] border border-[#d8cdbc] bg-white px-4 py-3 text-sm text-[#1f1a16]"
+                    />
+                  </label>
+                </div>
+                <button
+                  type="button"
+                  disabled={supportBusy}
+                  onClick={submitReschedule}
+                  className="mt-4 w-full rounded-full bg-[#173d33] px-5 py-3 text-sm font-semibold text-white disabled:opacity-70"
+                >
+                  {supportBusy ? "Sending..." : "Send new date and time"}
+                </button>
+              </div>
+            ) : null}
+            <SupportButton label="Running Late" disabled={supportBusy} onClick={() => support("running_late_clicked", "Hey, I'm running a few minutes behind but still coming.")} />
+            <SupportButton label="Can't Make It" disabled={supportBusy} onClick={() => support("cant_make_it_clicked", "Hey, I won't be able to make it today. Can we reschedule?")} />
+          </div>
         </section>
       </div>
 
